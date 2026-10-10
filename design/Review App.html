@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LEE 带货后台 · 审核页</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../studio/studio-ui-v3.css">
+<link rel="stylesheet" href="review-app.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script>window.STUDIO_URL='../studio/Shopee%20Post%20Maker%20v3.html';</script>
+<script src="review-render.js"></script>
+<script src="review-data.js"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="browser-window.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="review-screens.jsx"></script>
+<script type="text/babel" src="review-edit.jsx"></script>
+<script type="text/babel">
+const TWEAK_DEFAULTS=/*EDITMODE-BEGIN*/{"device":"手机","state":"正常"}/*EDITMODE-END*/;
+
+function RvStage({w,h,children}){
+  const [s,setS]=React.useState(1);
+  React.useEffect(()=>{
+    const f=()=>setS(Math.min(1,(window.innerWidth-40)/w,(window.innerHeight-40)/h));
+    f();window.addEventListener('resize',f);
+    return ()=>window.removeEventListener('resize',f);
+  },[w,h]);
+  return (<div className="rv-stage"><div style={{width:w*s,height:h*s,flex:'none'}}><div style={{width:w,height:h,transform:'scale('+s+')',transformOrigin:'0 0'}}>{children}</div></div></div>);
+}
+
+function App(){
+  const [t,setTweak]=useTweaks(TWEAK_DEFAULTS);
+  const boot=React.useMemo(()=>RV.initialDrafts(),[]);
+  const [drafts,setDrafts]=React.useState(boot.drafts);
+  const dRef=React.useRef(drafts);dRef.current=drafts;
+  const rotRef=React.useRef(boot.rot),prevRef=React.useRef(boot.prev);
+  const [posters,setPosters]=React.useState({});
+  const reqRef=React.useRef({});
+  const [tab,setTab]=React.useState('queue');
+  const [editId,setEditId]=React.useState(null);
+  const [toast,setToast]=React.useState(null);
+  const toastT=React.useRef(0);
+  const [log,setLog]=React.useState(RV.LOG);
+  const [collecting,setCollecting]=React.useState('');
+  const [authed,setAuthed]=React.useState(t.state!=='登录页');
+  const desk=t.device==='电脑',paused=t.state==='Token 失效';
+
+  /* render a poster whenever a draft's studio state changes */
+  React.useEffect(()=>{
+    drafts.forEach(d=>{
+      if(d.status==='skipped')return;
+      const st=RV.studioState(d),k=PosterRenderer.hash(JSON.stringify(st));
+      if(reqRef.current[d.id]===k)return;
+      reqRef.current[d.id]=k;
+      setPosters(p=>({...p,[d.id]:{...(p[d.id]||{}),busy:true,err:false}}));
+      PosterRenderer.render(st)
+        .then(src=>{if(reqRef.current[d.id]===k)setPosters(p=>({...p,[d.id]:{src,busy:false,err:false}}));})
+        .catch(()=>{if(reqRef.current[d.id]===k)setPosters(p=>({...p,[d.id]:{...(p[d.id]||{}),busy:false,err:true}}));});
+    });
+  },[drafts]);
+
+  /* demo states from Tweaks */
+  const prevState=React.useRef(t.state);
+  React.useEffect(()=>{
+    const was=prevState.current;prevState.current=t.state;
+    setAuthed(t.state!=='登录页');
+    const empty=t.state==='空队列';
+    if(was===t.state?!empty:(!empty&&was!=='空队列'))return;
+    const b=RV.initialDrafts();
+    if(empty)b.drafts.forEach(d=>{if(d.id==='d4'){d.status='approved';d.approvedAt=2;}else if(d.status==='draft')d.status='skipped';});
+    rotRef.current=b.rot;prevRef.current=b.prev;
+    setDrafts(b.drafts);setEditId(null);setTab('queue');
+  },[t.state]);
+
+  const say=(msg,undo)=>{clearTimeout(toastT.current);setToast({msg,undo,id:Date.now()});toastT.current=setTimeout(()=>setToast(null),undo?5000:2600);};
+  const patch=(id,fn)=>setDrafts(ds=>ds.map(d=>d.id===id?fn(d):d));
+  const approve=(id,form)=>{
+    const cur=drafts.find(x=>x.id===id);if(!cur)return;
+    const again=cur.status==='approved';
+    const n=drafts.filter(x=>x.status==='approved').length;
+    const label=RV.slotsFor(n+1)[n].label;
+    patch(id,d=>({...d,...(form||{}),status:'approved',approvedAt:again?d.approvedAt:Date.now(),priceChanged:null,isNew:false}));
+    setEditId(null);
+    say(again?'已保存修改':'已批准 · '+label+' 发布');
+  };
+  const skip=id=>{patch(id,d=>({...d,status:'skipped'}));say('已跳过',()=>patch(id,d=>({...d,status:'draft'})));};
+  const unapprove=id=>{patch(id,d=>({...d,status:'draft',approvedAt:0}));say('已撤回，回到待审核');};
+  const commit=(id,form)=>patch(id,d=>({...d,...form}));
+  const back=(id,form)=>{commit(id,form);setEditId(null);};
+  const retryPoster=id=>{delete reqRef.current[id];setDrafts(ds=>ds.slice());};
+  const collect=()=>{
+    if(collecting)return;
+    ['抓取中… 爆卖','抓取中… 爆卖 ✓ 高佣','抓取中… 爆卖 ✓ 高佣 ✓ 大折扣'].forEach((s,i)=>setTimeout(()=>setCollecting(s),i*800));
+    setTimeout(()=>{
+      setCollecting('');
+      const ds=dRef.current,have=new Set(ds.map(x=>x.id));
+      const fresh=RV.RESERVE.filter(p=>!have.has(p.id)).map(p=>{const d=RV.makeDraft(p,prevRef.current,rotRef.current);prevRef.current=d.tpl;d.isNew=true;return d;});
+      if(fresh.length)setDrafts([...fresh,...ds]);
+      say(fresh.length?'抓到 '+fresh.length+' 个新品 · 其余的发过了或不达标':'没有新的 · 其余的 30 天内发过或不达标');
+    },2600);
+  };
+  const retryLog=id=>{
+    const upd=fn=>setLog(L=>L.map(g=>({...g,items:g.items.map(it=>it.id===id?fn(it):it)})));
+    upd(it=>({...it,retrying:true}));
+    setTimeout(()=>{upd(it=>({...it,retrying:false,kind:'posted',time:'刚刚',msg:'手动重试成功'}));say('已发布到 Facebook 专页');},1600);
+  };
+  const login=()=>{setAuthed(true);if(t.state==='登录页')setTweak('state','正常');};
+  const goTab=k=>{setEditId(null);setTab(k);};
+
+  const pendingN=drafts.filter(d=>d.status==='draft').length;
+  const ed=editId?drafts.find(d=>d.id===editId):null;
+  let body;
+  if(!authed)body=<RvLogin onLogin={login}/>;
+  else{
+    const screen=ed?<RvEdit key={ed.id} d={ed} info={posters[ed.id]} desk={desk} onBack={back} onCommit={commit} onApprove={approve} onToast={say} onRetryPoster={retryPoster}/>
+      :tab==='queue'?<RvQueue drafts={drafts} posters={posters} paused={paused} collecting={collecting} onCollect={collect} onApprove={id=>approve(id)} onSkip={skip} onEdit={setEditId} onUnapprove={unapprove} onRetryToken={()=>{setTweak('state','正常');say('Token 正常 · 已恢复发布');}} onRetryPoster={retryPoster}/>
+      :tab==='log'?<RvLog log={log} onRetry={retryLog} onToast={say}/>
+      :<RvStats/>;
+    body=(<>{desk&&<RvTopNav tab={ed?'':tab} setTab={goTab} count={pendingN}/>}<div className="rv-main">{screen}</div>{!desk&&!ed&&<RvTabs tab={tab} setTab={goTab} count={pendingN}/>}</>);
+  }
+  const app=(<div className={'rv '+(desk?'desk':'phone')}>{body}<RvToast t={toast} onUndo={()=>{if(toast&&toast.undo)toast.undo();setToast(null);}}/></div>);
+  return (<>
+    <RvStage w={desk?1280:402} h={desk?800:874}>
+      {desk?<ChromeWindow width={1280} height={800} url="lee-autopost.example.com" tabs={[{title:'LEE 带货后台'}]}>{app}</ChromeWindow>
+        :<IOSDevice dark time="10:15">{app}</IOSDevice>}
+    </RvStage>
+    <TweaksPanel title="Tweaks">
+      <TweakSection label="演示"/>
+      <TweakRadio label="设备" value={t.device} options={['手机','电脑']} onChange={v=>setTweak('device',v)}/>
+      <TweakSelect label="状态" value={t.state} options={['正常','Token 失效','空队列','登录页']} onChange={v=>setTweak('state',v)}/>
+    </TweaksPanel>
+  </>);
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

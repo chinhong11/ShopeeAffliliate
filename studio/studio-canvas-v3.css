@@ -1,0 +1,338 @@
+/* ============================================================
+   Shopee Post Studio v3 — POST CANVAS (1080×1080)
+   Authentic "friend sharing" look + conversion elements
+   t1 hero · t2 price · t3 flash · t4 chat · t5 review
+   t6 cover · t7 grid ·  t8 carousel set
+   ============================================================ */
+
+#post{
+  position:absolute;top:0;left:0;width:1080px;height:1080px;transform-origin:top left;
+  overflow:hidden;user-select:none;background:#e9ebee;
+  font-family:"Noto Sans SC","Nunito",sans-serif;
+  --red:#e8232e;          /* LEE signature red */
+  --orange:#ee4d2d;       /* shopee */
+  --gold:#ffb400;
+  --inkk:#1c1c1e;
+  --cream:#fdf6ec;
+}
+#photo{position:absolute;inset:0;background-repeat:no-repeat;background-position:center;background-size:cover;cursor:grab;}
+#photo.dragging{cursor:grabbing;}
+#scrim{position:absolute;inset:0;pointer-events:none;z-index:2;
+  background:linear-gradient(to top,rgba(0,0,0,var(--scrim,.24)) 0%,rgba(0,0,0,calc(var(--scrim,.24)*.5)) 26%,rgba(0,0,0,0) 54%);}
+#photo.empty{background:repeating-conic-gradient(#e6e8ec 0% 25%,#f3f5f7 0% 50%) 50%/72px 72px;cursor:default;}
+#post.scrim-off #scrim{display:none!important;}
+.drop-cue{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;color:#9aa2ad;font-family:"Nunito",sans-serif;font-weight:800;pointer-events:none;padding:40px;z-index:1;}
+#photo.empty ~ .drop-cue{display:flex;}
+.drop-cue .ring{width:120px;height:120px;border-radius:50%;border:5px dashed #bcc3cd;display:grid;place-items:center;
+  font-size:64px;color:#bcc3cd;margin-bottom:22px;line-height:1;}
+.drop-cue .big{font-size:30px;color:#8b93a0;}
+.drop-cue .small{font-size:20px;font-weight:700;margin-top:10px;color:#a7aeb8;}
+#post.drag-over #photo.empty{filter:brightness(.96);}
+#post.drag-over .drop-cue .ring{border-color:var(--orange);color:var(--orange);}
+
+/* ---------------- BRAND BADGE ---------------- */
+#badge{position:absolute;z-index:8;left:46px;top:46px;display:flex;align-items:center;
+  font-family:"Montserrat","Noto Sans SC",sans-serif;}
+/* white circle sticker — LEE Sharing signature */
+#post.badge-lee #badge{flex-direction:column;justify-content:center;gap:0;width:150px;height:150px;border-radius:50%;
+  background:#fff;box-shadow:0 8px 24px rgba(0,0,0,.16);text-align:center;transform:rotate(-6deg);}
+#post.badge-lee #badge .av{display:none;}
+#post.badge-lee #badge .bt{line-height:1;}
+#post.badge-lee #badge .bt b{display:block;font-size:40px;font-weight:900;color:var(--inkk);letter-spacing:.01em;}
+#post.badge-lee #badge .bt span{display:block;font-family:"Caveat",cursive;font-size:30px;font-weight:700;color:var(--badgec,#1c1c1e);margin-top:2px;}
+/* pill + avatar */
+#post.badge-pill #badge{gap:14px;background:rgba(255,255,255,.95);backdrop-filter:blur(4px);
+  padding:12px 20px 12px 12px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.18);}
+#post.badge-pill #badge .av{width:50px;height:50px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--badgec,#1c1c1e);color:#fff;font-weight:900;font-size:21px;font-family:"Montserrat",sans-serif;}
+#post.badge-pill #badge .bt{line-height:1.05;}
+#post.badge-pill #badge .bt b{display:block;font-size:23px;font-weight:900;color:#16181f;}
+#post.badge-pill #badge .bt span{font-size:14px;font-weight:700;color:#7a808c;letter-spacing:.06em;text-transform:uppercase;}
+
+/* ---------------- DISCOUNT SEAL ---------------- */
+#seal{position:absolute;z-index:9;right:48px;top:46px;width:184px;height:184px;
+  display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;
+  background:var(--red);clip-path:var(--burst);filter:drop-shadow(0 8px 18px rgba(0,0,0,.28));
+  transform:rotate(8deg);font-family:"Montserrat","Noto Sans SC",sans-serif;line-height:1;}
+#post.has-seal #seal{display:flex;}
+#seal .sp{font-weight:900;font-size:58px;letter-spacing:-.02em;}
+#seal .ss{font-weight:800;font-size:22px;letter-spacing:.18em;margin-top:4px;text-transform:uppercase;opacity:.95;}
+
+/* ---------------- HOOK STICKERS (signature red/white-outline) ---------------- */
+#caption{position:absolute;display:flex;flex-direction:column;gap:12px;align-items:flex-start;z-index:6;}
+.sticker{font-weight:900;line-height:1.12;letter-spacing:.005em;margin:0;white-space:pre-wrap;word-break:break-word;
+  font-family:var(--titlefont,"Noto Sans SC","Nunito");
+  text-shadow:var(--stroke);paint-order:stroke fill;}
+#line1{color:var(--c1,#e8232e);}
+#line2{color:var(--c2,#8f8f8f);}
+/* marker highlight mode */
+#post.mk .sticker{text-shadow:none;paint-order:normal;}
+#post.mk .ink{display:inline;background-image:linear-gradient(var(--hlc,#ffe14d),var(--hlc,#ffe14d));
+  background-repeat:no-repeat;background-size:100% .58em;background-position:0 92%;
+  -webkit-box-decoration-break:clone;box-decoration-break:clone;padding:.02em .14em;border-radius:.06em;}
+
+/* ---------------- PAPER PRICE TAG ---------------- */
+#priceTag{position:absolute;z-index:9;display:none;flex-direction:column;align-items:center;justify-content:center;
+  background:#fff;border-radius:22px;padding:26px 40px 30px;box-shadow:0 14px 34px rgba(0,0,0,.22);
+  transform:rotate(5deg);line-height:1;text-align:center;}
+#post.has-price #priceTag{display:flex;}
+#priceTag .pt-tape{position:absolute;top:-16px;left:50%;transform:translateX(-50%) rotate(-3deg);width:120px;height:34px;
+  background:rgba(255,214,90,.85);box-shadow:0 2px 6px rgba(0,0,0,.12);border-radius:3px;}
+#priceTag .pt-was{font-size:27px;color:#9aa0a6;text-decoration:line-through;font-weight:800;font-family:"Nunito",sans-serif;}
+#priceTag .pt-now{font-family:"Montserrat",sans-serif;font-size:74px;font-weight:900;color:var(--red);letter-spacing:-.02em;margin-top:6px;white-space:nowrap;}
+#priceTag .pt-off{position:absolute;right:-22px;top:-20px;background:var(--inkk);color:#fff;font-weight:900;font-size:24px;
+  padding:10px 14px;border-radius:99px;transform:rotate(8deg);font-family:"Montserrat",sans-serif;}
+#priceTag .pt-off:empty{display:none;}
+#priceTag .pt-was:empty{display:none;}
+
+/* ---------------- HAND-DRAWN ARROW ---------------- */
+#arrow{position:absolute;z-index:8;width:150px;height:125px;color:var(--red);display:none;
+  filter:drop-shadow(0 2px 0 rgba(255,255,255,.9)) drop-shadow(0 -2px 0 rgba(255,255,255,.9)) drop-shadow(2px 0 0 rgba(255,255,255,.9)) drop-shadow(-2px 0 0 rgba(255,255,255,.9));}
+#post.has-arrow #arrow{display:block;}
+
+/* ---------------- FLOATING CTA (t2/t4) ---------------- */
+#ctaFloat{position:absolute;z-index:10;display:none;align-items:center;font-weight:900;color:#fff;
+  background:var(--red);border-radius:999px;padding:24px 44px;font-size:38px;transform:rotate(-1.5deg);
+  box-shadow:0 6px 0 rgba(0,0,0,.18),0 18px 40px rgba(232,35,46,.35);white-space:nowrap;}
+
+/* ---------------- BOTTOM INFO BAR ---------------- */
+#bottomBar{position:absolute;z-index:7;left:0;right:0;bottom:0;height:140px;background:#fff;
+  display:flex;align-items:center;gap:26px;padding:0 44px;box-shadow:0 -10px 30px rgba(0,0,0,.10);
+  font-family:"Nunito","Noto Sans SC",sans-serif;}
+#post.no-bar #bottomBar{display:none;}
+.bb-proof{display:flex;align-items:center;gap:10px;font-size:30px;font-weight:900;color:var(--inkk);flex:none;}
+.bb-proof .stars{color:var(--gold);font-size:27px;letter-spacing:-2px;}
+.bb-proof .sold{color:#6c6c6c;font-weight:700;font-size:24px;}
+#post.no-proof .bb-proof{display:none;}
+.bb-voucher{display:flex;align-items:center;gap:7px;font-size:23px;font-weight:900;color:var(--orange);
+  border:2.5px dashed var(--orange);border-radius:12px;padding:9px 15px;flex:none;}
+#post.no-voucher .bb-voucher{display:none;}
+.bb-cta{margin-left:auto;display:flex;align-items:center;font-size:31px;font-weight:900;color:#fff;
+  background:var(--red);border-radius:999px;padding:20px 34px;transform:rotate(-1deg);
+  box-shadow:0 5px 0 rgba(0,0,0,.15),0 14px 28px rgba(232,35,46,.32);white-space:nowrap;}
+#post.no-cta .bb-cta,#post.no-cta #ctaFloat{display:none;}
+.bb-shopee{display:flex;align-items:center;gap:7px;color:var(--orange);font-weight:900;font-size:22px;
+  font-family:"Montserrat",sans-serif;flex:none;}
+#post.no-shopee .bb-shopee{display:none;}
+.bb-shopee svg{width:26px;height:26px;}
+
+/* =====================================================
+   T1 — 爆款分享 HERO  (full-bleed, signature style)
+   ===================================================== */
+#post.t8 #photo,#post.t8 #scrim{inset:0 0 140px 0;}
+#post.t8.no-bar #photo,#post.t8.no-bar #scrim{inset:0;}
+#post.t1 #grid,#post.t1 #scrim{inset:0 0 140px 0;}
+#post.t1.no-bar #grid,#post.t1.no-bar #scrim{inset:0;}
+#post.t1 #caption,#post.t8 #caption{left:56px;right:140px;bottom:330px;}
+#post.t1.no-bar #caption,#post.t8.no-bar #caption{bottom:190px;}
+#post.t1 #priceTag,#post.t8 #priceTag{right:64px;bottom:180px;}
+#post.t1 #arrow,#post.t8 #arrow{right:104px;bottom:118px;transform:rotate(14deg);}
+#post.t1 #seal,#post.t8 #seal{top:200px;}
+
+/* =====================================================
+   T2 — 价格暴击 PRICE SHOCK  (photo top / cream band)
+   ===================================================== */
+#post.t2{background:#fff7ec;}
+#post.t2 #grid,#post.t2 #scrim{inset:0 0 460px 0;}
+#post.t2 #band{display:block;position:absolute;left:0;right:0;top:620px;bottom:0;background:#fff7ec;
+  box-shadow:0 -12px 34px rgba(0,0,0,.12);}
+#post.t2 #caption{left:56px;right:340px;bottom:480px;z-index:6;}
+#post.t2 #bigPrice{display:flex;}
+#post.t2 #ctaFloat{display:flex;right:64px;top:700px;}
+#post.t2 #seal{top:500px;right:56px;z-index:9;}
+#post.t2 #bottomBar{background:transparent;box-shadow:none;height:120px;}
+#post.t2 .bb-cta{display:none;}
+#post.t2 #priceTag{display:none!important;}
+#post.t2 #arrow{left:620px;top:560px;transform:rotate(64deg) scaleX(-1);display:none;}
+
+#bigPrice{position:absolute;z-index:7;display:none;flex-direction:column;left:64px;top:668px;line-height:1;}
+#bigPrice .bp-was{font-size:36px;color:#8d8d93;text-decoration:line-through;font-weight:800;font-family:"Nunito",sans-serif;}
+#bigPrice .bp-now{font-family:"Montserrat",sans-serif;font-weight:900;font-size:150px;letter-spacing:-.03em;color:var(--red);margin-top:10px;white-space:nowrap;}
+#bigPrice .scribble{width:96%;height:24px;color:var(--gold);margin-top:8px;}
+#bigPrice .bp-pct{position:absolute;right:-30px;top:-6px;background:var(--red);color:#fff;font-weight:900;font-size:30px;
+  padding:10px 16px;border-radius:12px;transform:rotate(6deg);font-family:"Montserrat",sans-serif;}
+#bigPrice .bp-pct:empty{display:none;}
+#post.no-price #bigPrice{display:none!important;}
+
+/* =====================================================
+   T3 — 限时抢购 FLASH  (cream, ribbon, countdown, stock)
+   ===================================================== */
+#post.t3{background:var(--postbg,#fdf6ec);}
+#post.t3 #grid{inset:250px 70px 430px 70px;border-radius:26px;overflow:hidden;box-shadow:0 22px 50px rgba(0,0,0,.18);}
+#post.t3 #scrim{display:none;}
+#post.t3 #ribbon{display:flex;}
+#ribbon{position:absolute;z-index:8;left:0;right:0;top:0;height:88px;background:var(--red);color:#fff;display:none;
+  align-items:center;justify-content:center;font-weight:900;font-size:37px;letter-spacing:.12em;
+  font-family:"Noto Sans SC",sans-serif;box-shadow:0 6px 18px rgba(232,35,46,.3);}
+#post.t3 #badge{display:none!important;}
+#post.t3 #caption{left:80px;right:80px;top:112px;align-items:center;text-align:center;}
+#post.t3 #cdWrap{display:flex;}
+#cdWrap{position:absolute;z-index:7;left:0;right:0;top:668px;display:none;flex-direction:column;align-items:center;gap:14px;}
+#cdWrap .cd-label{font-size:27px;font-weight:800;color:#8a7a63;letter-spacing:.14em;}
+#cdWrap .cd-chips{display:flex;align-items:center;gap:10px;font-family:"Montserrat",sans-serif;}
+#cdWrap .cd-chips b{background:var(--inkk);color:#fff;font-weight:900;font-size:64px;line-height:1;
+  padding:20px 22px;border-radius:16px;min-width:112px;text-align:center;letter-spacing:.02em;
+  box-shadow:0 8px 20px rgba(28,28,30,.28);}
+#cdWrap .cd-chips span{font-size:52px;font-weight:900;color:var(--red);}
+#post.t3 #stockWrap{display:block;}
+#stockWrap{position:absolute;z-index:7;left:150px;right:150px;top:880px;display:none;}
+#stockWrap .stock-bar{height:34px;border-radius:99px;background:#f0e2cb;overflow:hidden;position:relative;}
+#stockWrap .stock-bar i{position:absolute;left:0;top:0;bottom:0;width:var(--stock,82%);border-radius:99px;
+  background:linear-gradient(90deg,#ff9a3d,var(--orange));}
+#stockWrap .stock-row{display:flex;justify-content:space-between;margin-top:12px;font-weight:900;font-size:26px;color:var(--inkk);}
+#stockWrap .stock-row span:last-child{color:var(--orange);}
+#post.t3 #priceTag{right:96px;bottom:400px;transform:rotate(6deg);z-index:8;}
+#post.t3 #priceTag .pt-now{font-size:64px;}
+#post.t3 #seal{top:214px;left:34px;right:auto;transform:rotate(-9deg);width:164px;height:164px;}
+#post.t3 #seal .sp{font-size:50px;}
+#post.t3 #arrow{display:none;}
+
+/* =====================================================
+   T4 — 好友爆料 WHATSAPP CHAT
+   ===================================================== */
+#post.t4{background:#f6efe6;}
+#post.t4 #photo,#post.t4 #scrim{display:none;}
+#post.t4 .drop-cue{display:none!important;}
+#post.t4 #chat{display:flex;}
+#post.t4 #badge{display:none!important;}
+#post.t4 #caption{left:60px;right:60px;top:44px;align-items:center;text-align:center;z-index:9;transform:rotate(-1.6deg);}
+#post.t4 #line2{display:none!important;}
+#post.t4 #ctaFloat{display:flex;left:50%;bottom:56px;transform:translateX(-50%) rotate(-1.5deg);}
+#post.t4 #priceTag,#post.t4 #bottomBar,#post.t4 #arrow,#post.t4 #seal{display:none!important;}
+
+#chat{position:absolute;z-index:5;left:70px;right:70px;top:196px;bottom:190px;display:none;flex-direction:column;
+  border-radius:30px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.22);font-family:"Nunito","Noto Sans SC",sans-serif;}
+.ch-head{flex:none;height:104px;background:#fff;display:flex;align-items:center;gap:16px;padding:0 28px;
+  border-bottom:1.5px solid #ececec;}
+.ch-back{font-size:52px;color:#0a84ff;font-weight:700;line-height:1;margin-top:-6px;}
+.ch-av{width:64px;height:64px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:32px;
+  background:linear-gradient(135deg,#ffd9a8,#ff9a3d);background-size:cover;background-position:center;}
+.ch-names{flex:1;min-width:0;line-height:1.15;}
+.ch-names b{display:block;font-size:30px;font-weight:900;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ch-names span{font-size:20px;color:#8a8a8e;font-weight:700;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ch-icons{display:flex;gap:22px;font-size:30px;opacity:.85;}
+.ch-body{flex:1;background:#efe7dc;background-image:radial-gradient(rgba(160,130,90,.07) 2px,transparent 2px);
+  background-size:34px 34px;padding:26px 30px;display:flex;flex-direction:column;gap:18px;overflow:hidden;}
+.ch-date{display:flex;justify-content:center;}
+.ch-date span{background:rgba(255,255,255,.85);color:#7a7a7e;font-size:19px;font-weight:800;padding:7px 18px;border-radius:10px;
+  box-shadow:0 1px 2px rgba(0,0,0,.06);}
+.msg{position:relative;max-width:72%;background:#fff;border-radius:22px;padding:16px 22px 30px;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);font-size:27px;line-height:1.35;color:#111;font-weight:700;}
+.msg.left{align-self:flex-start;border-bottom-left-radius:6px;}
+.msg.right{align-self:flex-end;background:#d9fdd3;border-bottom-right-radius:6px;}
+.msg p{margin:0;word-break:break-word;}
+.msg .mname{display:block;color:#e8702a;font-size:21px;font-weight:900;margin-bottom:4px;}
+.msg .mtime{position:absolute;right:16px;bottom:8px;font-size:17px;color:#9a9a9e;font-weight:700;white-space:nowrap;}
+.msg .mtime .tick{color:#53bdeb;font-weight:900;letter-spacing:-2px;}
+.msg.hasimg{padding:10px 10px 34px;}
+.msg.hasimg p{padding:10px 12px 0;}
+.msg .mimg{width:100%;height:300px;border-radius:14px;background:#e5e0d8 center/cover no-repeat;display:block;}
+.msg .mimg.empty::after{content:"📷 产品照片";display:flex;align-items:center;justify-content:center;height:100%;
+  color:#a9a294;font-size:26px;font-weight:800;}
+.msg .lprev{display:flex;align-items:center;gap:14px;background:rgba(0,0,0,.055);border-radius:14px;padding:12px;margin-bottom:8px;}
+.msg .lthumb{width:84px;height:84px;border-radius:10px;flex:none;background:linear-gradient(135deg,#ff9a3d,var(--orange)) center/cover no-repeat;
+  display:grid;place-items:center;font-size:40px;color:#fff;}
+.msg .ltxt{line-height:1.2;min-width:0;}
+.msg .ltxt b{display:block;font-size:23px;color:#111;}
+.msg .ltxt span{font-size:19px;color:#7a7a7e;font-weight:700;}
+.msg .mlink{color:#0a6cff;text-decoration:underline;font-weight:800;word-break:break-all;}
+.msg .mreact{position:absolute;left:14px;bottom:-20px;background:#fff;border-radius:99px;font-size:20px;font-weight:800;
+  padding:5px 12px;box-shadow:0 2px 6px rgba(0,0,0,.14);border:1.5px solid #eee;}
+.msg.last{margin-bottom:10px;}
+
+/* =====================================================
+   T5 — 真实好评 REVIEW
+   ===================================================== */
+#post.t5{background:var(--postbg,#fbf3ea);}
+#post.t5 #grid{inset:264px 130px 452px 130px;border-radius:26px;overflow:hidden;box-shadow:0 24px 55px rgba(0,0,0,.18);}
+#post.t5 #scrim{display:none;}
+#post.t5 #badge{left:50%;top:52px;transform:translateX(-50%) rotate(0deg);}
+#post.t5.badge-lee #badge{width:auto;height:auto;border-radius:999px;flex-direction:row;gap:10px;padding:14px 26px;transform:translateX(-50%);}
+#post.t5.badge-lee #badge .bt{display:flex;align-items:baseline;gap:10px;}
+#post.t5.badge-lee #badge .bt b{font-size:30px;}
+#post.t5.badge-lee #badge .bt span{font-size:26px;margin-top:0;}
+#post.t5 #reviewHero{display:flex;}
+#reviewHero{position:absolute;z-index:6;left:0;right:0;top:130px;display:none;flex-direction:column;align-items:center;gap:4px;}
+#reviewHero .rv-stars{color:var(--gold);font-size:66px;letter-spacing:4px;line-height:1;text-shadow:0 3px 6px rgba(0,0,0,.08);}
+#reviewHero .rv-row{display:flex;align-items:baseline;gap:14px;}
+#reviewHero .rv-rate{font-family:"Montserrat",sans-serif;font-size:52px;font-weight:900;color:var(--inkk);}
+#reviewHero .rv-sold{font-size:28px;font-weight:800;color:#8a7a63;}
+#post.no-proof #reviewHero{display:none!important;}
+#post.t5 #reviewBubble{display:block;}
+#reviewBubble{position:absolute;z-index:6;left:110px;right:110px;top:664px;display:none;background:#fff;border-radius:24px;
+  padding:30px 36px;box-shadow:0 14px 36px rgba(0,0,0,.12);}
+#reviewBubble::before{content:"";position:absolute;top:-16px;left:90px;border:18px solid transparent;border-bottom-color:#fff;border-top:0;}
+#reviewBubble p{margin:0;font-size:31px;line-height:1.45;font-weight:800;color:var(--inkk);}
+#reviewBubble .rb-a{display:flex;align-items:center;gap:16px;margin-top:14px;}
+#reviewBubble .rb-a span{font-size:23px;font-weight:800;color:#8d8d93;}
+#reviewBubble .rb-v{color:#0f9d58!important;}
+#post.t5 #caption{left:80px;right:80px;top:920px;display:none;}
+#post.t5 #priceTag{left:96px;bottom:388px;transform:rotate(-5deg);z-index:8;}
+#post.t5 #priceTag .pt-now{font-size:60px;}
+#post.t5 #seal{display:none!important;}
+#post.t5 #arrow{display:none;}
+
+/* =====================================================
+   T6 — 杂志封面 COVER
+   ===================================================== */
+#post.t6c #grid,#post.t6c #scrim{inset:0;}
+#post.t6c #scrim{background:linear-gradient(105deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.32) 38%,rgba(0,0,0,0) 66%),
+  linear-gradient(to top,rgba(0,0,0,.45),transparent 30%);}
+#post.t6c #caption{left:64px;right:390px;top:216px;gap:20px;}
+#post.t6c #line1{line-height:1.02;}
+#post.t6c .sticker{text-shadow:0 4px 20px rgba(0,0,0,.45);paint-order:normal;}
+#post.t6c.mk .sticker{text-shadow:none;}
+#post.t6c #priceTag{right:64px;bottom:180px;}
+#post.t6c #bottomBar{background:rgba(18,18,22,.55);backdrop-filter:blur(6px);box-shadow:none;height:130px;}
+#post.t6c .bb-proof{color:#fff;}
+#post.t6c .bb-proof .sold{color:rgba(255,255,255,.8);}
+#post.t6c .bb-voucher{color:#ffd9a0;border-color:rgba(255,217,160,.8);}
+#post.t6c .bb-shopee{color:#ff8a50;}
+#post.t6c #seal{top:210px;}
+#post.t6c #arrow{display:none;}
+
+/* =====================================================
+   PHOTO GRID — every template supports 4 插图 layouts
+   ===================================================== */
+#grid{position:absolute;display:none;z-index:1;gap:7px;}
+#post.hasgrid #grid{display:grid;}
+#post.hasgrid #photo{display:none!important;}
+#post.hasgrid .drop-cue{display:none!important;}
+#grid:not([data-layout="1"]){background:#fff;}
+#grid[data-layout="1"]{grid-template-columns:1fr;grid-template-rows:1fr;gap:0;}
+#grid[data-layout="1"] .cellphoto:nth-child(n+2){display:none;}
+#grid[data-layout="2"]{grid-template-columns:1fr 1fr;grid-template-rows:1fr;}
+#grid[data-layout="2"] .cellphoto:nth-child(n+3){display:none;}
+#grid[data-layout="3"]{grid-template-columns:1.35fr 1fr;grid-template-rows:1fr 1fr;}
+#grid[data-layout="3"] .cellphoto:first-child{grid-row:1/3;}
+#grid[data-layout="3"] .cellphoto:nth-child(n+4){display:none;}
+#grid[data-layout="4"]{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;}
+.cellphoto{position:relative;overflow:hidden;background-repeat:no-repeat;background-position:center;background-size:cover;cursor:grab;}
+.cellphoto.dragging{cursor:grabbing;}
+.cellphoto.empty{background:repeating-conic-gradient(#e6e8ec 0 25%,#f3f5f7 0 50%) 50%/46px 46px;cursor:pointer;}
+.cellphoto.empty::after{content:"＋";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:"Nunito",sans-serif;font-size:64px;font-weight:800;color:#c2c8d0;}
+#grid[data-layout="1"] .cellphoto.empty::after{content:"＋ 把产品照片拖进来";font-size:34px;color:#9aa2ad;}
+
+/* =====================================================
+   T8 — 轮播套图 (hero theme + page no)
+   ===================================================== */
+#pageNo{position:absolute;z-index:9;right:48px;top:52px;display:none;
+  background:rgba(22,24,31,.72);color:#fff;font-family:"Montserrat",sans-serif;font-weight:900;
+  font-size:27px;letter-spacing:.06em;padding:12px 24px;border-radius:999px;backdrop-filter:blur(3px);}
+#post.t8 #pageNo{display:block;}
+
+/* hide grid/chat/flash/review extras everywhere else (default none already) */
+#band,#cdWrap,#stockWrap,#reviewHero,#reviewBubble{pointer-events:none;}
+#ribbon,#bigPrice,#priceTag,#ctaFloat,#bottomBar,#chat{pointer-events:none;}
+#chat .ch-body,#chat .ch-head{pointer-events:none;}
+
+/* ---------------- sticker type scale (per template) ---------------- */
+.sticker{font-size:calc(var(--fs2,52px)*var(--ts,1));}
+#line1{font-size:calc(var(--fs1,96px)*var(--ts,1));}
+#post.t2{--fs1:80px;--fs2:44px;}
+#post.t3{--fs1:86px;--fs2:46px;}
+#post.t4{--fs1:62px;}
+#post.t6c{--fs1:112px;--fs2:54px;}
+#post.t7{--fs1:64px;--fs2:38px;}

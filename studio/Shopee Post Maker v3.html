@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shopee Post Studio v3 · 让人忍不住点的帖子</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Baloo+2:wght@700;800&family=Caveat:wght@600;700&family=Ma+Shan+Zheng&family=Montserrat:wght@700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
+<link rel="stylesheet" href="studio-ui-v3.css">
+<link rel="stylesheet" href="studio-canvas-v3.css">
+</head>
+<body>
+
+  <!-- ===================== APP BAR ===================== -->
+  <header class="appbar">
+    <div class="brandmark">
+      <span class="logo">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M5 7h14l-1 13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 7z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M9 7a3 3 0 0 1 6 0" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+      </span>
+      <span class="wm"><b>Shopee Post Studio</b><span>让人忍不住点的带货帖</span></span>
+    </div>
+    <div class="spacer"></div>
+    <div class="score" title="照片 + 钩子 + 价格 + 好评 + CTA + 优惠，点击率更高">
+      <span class="lbl">点击力</span>
+      <span class="dots" id="scoreDots"><i class="dot"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i></span>
+      <span class="verdict" id="scoreVerdict">蓄势待发 ✨</span>
+    </div>
+    <button class="dl" id="downloadBtn">⬇ 下载海报</button>
+  </header>
+
+  <div class="work">
+    <!-- ===================== CANVAS ===================== -->
+    <div class="stage">
+      <div class="canvas-wrap" id="canvasWrap">
+        <div id="post" class="t1">
+          <div id="photo" class="empty"></div>
+          <div id="grid">
+            <div class="cellphoto empty" id="cellphoto0" data-i="0"></div>
+            <div class="cellphoto empty" id="cellphoto1" data-i="1"></div>
+            <div class="cellphoto empty" id="cellphoto2" data-i="2"></div>
+            <div class="cellphoto empty" id="cellphoto3" data-i="3"></div>
+          </div>
+          <div id="scrim"></div>
+          <div class="drop-cue">
+            <div class="ring">＋</div>
+            <div class="big">把产品照片拖进来</div>
+            <div class="small">或点右侧「上传照片」· 也可直接粘贴</div>
+          </div>
+
+          <div id="band"></div>
+          <div id="ribbon">⚡ 限时抢购 · 手慢无 ⚡</div>
+
+          <!-- WhatsApp-style chat (t4) -->
+          <div id="chat">
+            <div class="ch-head">
+              <span class="ch-back">‹</span>
+              <span class="ch-av" id="chAv">🛒</span>
+              <span class="ch-names"><b id="chTitle">好物分享群 🔥</b><span id="chSub">你、Amy、Mei 和 45 人</span></span>
+              <span class="ch-icons"><i>📹</i><i>📞</i></span>
+            </div>
+            <div class="ch-body">
+              <div class="ch-date"><span>今天</span></div>
+              <div class="msg left"><span class="mname">Amy</span><p id="chM1">姐！上次你说的那个还有货吗？？</p><span class="mtime">10:23</span></div>
+              <div class="msg right hasimg"><div class="mimg" id="chImg"></div><p id="chM2">有！！Shopee 促销中 才 RM9.90 😍</p><span class="mtime">10:24 <b class="tick">✓✓</b></span></div>
+              <div class="msg right"><div class="lprev"><span class="lthumb" id="chThumb"></span><span class="ltxt"><b>Shopee Malaysia</b><span>今日闪购 · 库存有限</span></span></div><p class="mlink" id="chLink">s.shopee.com.my/9AbCdE</p><span class="mtime">10:24 <b class="tick">✓✓</b></span></div>
+              <div class="msg left last"><p id="chM3">快发我！我也要买 🥳</p><span class="mtime">10:25</span><span class="mreact">😍 2</span></div>
+            </div>
+          </div>
+
+          <div id="badge">
+            <span class="av">L</span>
+            <span class="bt"><b>LEE</b><span>Sharing</span></span>
+          </div>
+
+          <div id="seal"><span class="sp">-67%</span><span class="ss">OFF</span></div>
+          <div id="pageNo">1 / 4</div>
+
+          <!-- review proof (t5) -->
+          <div id="reviewHero">
+            <div class="rv-stars">★★★★★</div>
+            <div class="rv-row"><span class="rv-rate" id="rvRate">4.9</span><span class="rv-sold" id="rvSold">已售 12k+</span></div>
+          </div>
+          <div id="reviewBubble">
+            <p id="rbQuote">真的好用，已经回购第 3 次了！朋友看到也叫我帮她下单 😆</p>
+            <div class="rb-a"><span id="rbAuthor">— 真实买家</span><span class="rb-v" id="rbVerified">✅ 已验证购买</span></div>
+          </div>
+
+          <div id="caption">
+            <p class="sticker" id="line1"><span class="ink">我不允许你
+还不知道这个</span></p>
+            <p class="sticker" id="line2"><span class="ink">用过都说回不去了</span></p>
+          </div>
+
+          <!-- countdown + stock (t3) -->
+          <div id="cdWrap">
+            <div class="cd-label" id="cdLabel">距离恢复原价还有</div>
+            <div class="cd-chips"><b id="cdHH">02</b><span>:</span><b id="cdMM">47</b><span>:</span><b id="cdSS">19</b></div>
+          </div>
+          <div id="stockWrap">
+            <div class="stock-bar"><i id="stockFill"></i></div>
+            <div class="stock-row"><span id="stockTxt">只剩最后 37 件</span><span id="stockPctTxt">已抢 82%</span></div>
+          </div>
+
+          <!-- giant price (t2) -->
+          <div id="bigPrice">
+            <span class="bp-was" id="bpWas">RM 29.90</span>
+            <span class="bp-now" id="bpNow">RM 9.90</span>
+            <svg class="scribble" viewBox="0 0 300 22" preserveAspectRatio="none"><path d="M5 14 C 55 5, 105 20, 155 11 S 255 6, 295 13" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/></svg>
+            <span class="bp-pct" id="bpPct">-67%</span>
+          </div>
+
+          <!-- handwritten paper price tag -->
+          <div id="priceTag">
+            <i class="pt-tape"></i>
+            <span class="pt-was" id="ptWas">RM 29.90</span>
+            <span class="pt-now" id="ptNow">RM 9.90</span>
+            <span class="pt-off" id="ptOff">-67%</span>
+          </div>
+
+          <!-- hand-drawn arrow -->
+          <svg id="arrow" viewBox="0 0 120 100" fill="none">
+            <path d="M12 8 C 55 18, 88 34, 96 78" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+            <path d="M76 68 L 97 82 L 102 58" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+
+          <!-- floating CTA (t2 / t4) -->
+          <div id="ctaFloat">评论区拿链接 👇</div>
+
+          <!-- bottom info bar -->
+          <div id="bottomBar">
+            <div class="bb-proof"><span class="stars">★★★★★</span><b id="bbRate">4.9</b><span class="sold" id="bbSold">已售 12k+</span></div>
+            <div class="bb-voucher" id="bbVoucher">🎟 <b>LEE10</b></div>
+            <div class="bb-cta" id="bbCta">评论区拿链接 👇</div>
+            <div class="bb-shopee" id="bbShopee"><svg viewBox="0 0 24 24" fill="none"><path d="M5 7h14l-1 13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 7a3 3 0 0 1 6 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Shopee</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== CONTROL PANEL ===================== -->
+    <aside class="panel">
+
+      <!-- TEMPLATE -->
+      <section class="sec">
+        <div class="sec-h"><span class="ic">🎨</span><h2>选模板</h2><span class="tip">按“点击理由”选</span></div>
+        <div class="templates" id="templates">
+          <button class="tpl" data-tpl="t1" aria-pressed="true">
+            <span class="mini">
+              <i class="mp-ph" style="inset:0"></i>
+              <i style="left:8px;top:8px;width:26px;height:26px;background:#fff;border-radius:50%"></i>
+              <i class="mp-t r" style="left:10px;bottom:58px;width:52px;height:10px"></i>
+              <i class="mp-t g" style="left:10px;bottom:44px;width:36px"></i>
+              <i style="right:10px;bottom:34px;width:30px;height:24px;background:#fff;border-radius:4px;transform:rotate(6deg);box-shadow:0 2px 4px rgba(0,0,0,.2)"></i>
+              <i style="left:0;right:0;bottom:0;height:24px;background:#fff"></i>
+              <i class="mp-or" style="right:34px;bottom:5px;width:34px;height:14px;border-radius:99px"></i>
+            </span>
+            <span class="meta"><span class="zh">爆款分享</span><span class="en">信任 · Hero</span></span>
+          </button>
+          <button class="tpl" data-tpl="t2">
+            <span class="mini">
+              <i class="mp-ph" style="left:0;right:0;top:0;height:52%"></i>
+              <i style="left:0;right:0;bottom:0;height:48%;background:#fff7ec"></i>
+              <i class="mp-t r" style="left:10px;top:38%;width:44px;height:9px"></i>
+              <i style="left:10px;top:60%;width:56px;height:18px;background:#e8232e;border-radius:3px;opacity:.9"></i>
+              <i class="mp-t g" style="left:10px;bottom:12px;width:40px"></i>
+              <i class="mp-or" style="right:8px;bottom:20px;width:32px;height:14px;border-radius:99px"></i>
+            </span>
+            <span class="meta"><span class="zh">价格暴击</span><span class="en">省钱 · Price</span></span>
+          </button>
+          <button class="tpl" data-tpl="t3">
+            <span class="mini" style="background:#fdf6ec">
+              <i style="left:0;right:0;top:0;height:14px;background:#e8232e"></i>
+              <i class="mp-t k" style="left:50%;transform:translateX(-50%);top:20px;width:48px;height:9px"></i>
+              <i class="mp-phr" style="left:12px;top:36px;right:12px;height:44px;border-radius:5px"></i>
+              <i style="left:16px;bottom:32px;width:20px;height:16px;background:#1c1c1e;border-radius:3px"></i>
+              <i style="left:40px;bottom:32px;width:20px;height:16px;background:#1c1c1e;border-radius:3px"></i>
+              <i style="left:64px;bottom:32px;width:20px;height:16px;background:#1c1c1e;border-radius:3px"></i>
+              <i style="left:14px;right:14px;bottom:18px;height:8px;background:#f3e3cd;border-radius:99px"></i>
+              <i style="left:14px;bottom:18px;width:60%;height:8px;background:#ff7a00;border-radius:99px"></i>
+              <i style="left:0;right:0;bottom:0;height:12px;background:#fff"></i>
+            </span>
+            <span class="meta"><span class="zh">限时抢购</span><span class="en">紧迫 · Flash</span></span>
+          </button>
+          <button class="tpl" data-tpl="t4">
+            <span class="mini" style="background:#f6efe6">
+              <i style="left:8px;right:8px;top:14px;bottom:14px;background:#efe7dc;border-radius:7px;box-shadow:0 2px 6px rgba(0,0,0,.15)"></i>
+              <i style="left:8px;right:8px;top:14px;height:16px;background:#fff;border-radius:7px 7px 0 0"></i>
+              <i style="left:12px;top:17px;width:10px;height:10px;background:#25d366;border-radius:50%"></i>
+              <i style="left:14px;top:38px;width:52px;height:14px;background:#fff;border-radius:6px 6px 6px 2px"></i>
+              <i style="right:14px;top:58px;width:56px;height:24px;background:#d9fdd3;border-radius:6px 6px 2px 6px"></i>
+              <i style="left:14px;top:90px;width:44px;height:13px;background:#fff;border-radius:6px 6px 6px 2px"></i>
+              <i class="mp-t r" style="left:50%;transform:translateX(-50%) rotate(-2deg);top:2px;width:56px;height:9px"></i>
+            </span>
+            <span class="meta"><span class="zh">好友爆料</span><span class="en">信任 · Chat</span></span>
+          </button>
+          <button class="tpl" data-tpl="t5">
+            <span class="mini" style="background:#fbf3ea">
+              <span class="mp-star" style="position:absolute;left:50%;transform:translateX(-50%);top:12px">★★★★★</span>
+              <i class="mp-phr" style="left:20px;right:20px;top:26px;height:42px;border-radius:5px"></i>
+              <i style="left:14px;right:14px;bottom:32px;height:22px;background:#fff;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,.12)"></i>
+              <i style="left:0;right:0;bottom:0;height:16px;background:#fff"></i>
+              <i class="mp-or" style="right:12px;bottom:3px;width:30px;height:11px;border-radius:99px"></i>
+            </span>
+            <span class="meta"><span class="zh">真实好评</span><span class="en">口碑 · Review</span></span>
+          </button>
+          <button class="tpl" data-tpl="t6">
+            <span class="mini">
+              <i class="mp-ph" style="inset:0"></i>
+              <i style="inset:0;background:linear-gradient(100deg,rgba(0,0,0,.6),transparent 60%)"></i>
+              <i class="mp-t w" style="left:8px;top:22px;width:50px;height:13px"></i>
+              <i class="mp-t w" style="left:8px;top:39px;width:38px;height:13px"></i>
+              <i style="right:8px;bottom:26px;width:28px;height:22px;background:#fff;border-radius:4px;transform:rotate(6deg)"></i>
+              <i style="left:0;right:0;bottom:0;height:20px;background:rgba(20,20,24,.6)"></i>
+            </span>
+            <span class="meta"><span class="zh">杂志封面</span><span class="en">种草 · Cover</span></span>
+          </button>
+          <button class="tpl" data-tpl="t8">
+            <span class="mini" style="background:#2a2433">
+              <i style="left:26px;top:14px;width:78px;height:78px;border-radius:6px;background:linear-gradient(135deg,#cfe0fb,#5b9bf0);box-shadow:3px 3px 0 rgba(0,0,0,.25)"></i>
+              <i style="left:18px;top:10px;width:78px;height:78px;border-radius:6px;background:linear-gradient(135deg,#cfe8d6,#5cb874);box-shadow:3px 3px 0 rgba(0,0,0,.25)"></i>
+              <i style="left:10px;top:6px;width:78px;height:78px;border-radius:6px;background:linear-gradient(135deg,#ffd2a8,#f0904f);box-shadow:4px 4px 0 rgba(0,0,0,.3)"></i>
+              <i class="mp-t r" style="left:16px;top:22px;width:44px;height:9px"></i>
+              <i class="mp-t w" style="left:16px;top:36px;width:32px"></i>
+              <i style="right:8px;top:8px;width:26px;height:14px;border-radius:99px;background:rgba(255,255,255,.9)"></i>
+            </span>
+            <span class="meta"><span class="zh">轮播套图</span><span class="en">故事 · Set ×4</span></span>
+          </button>
+        </div>
+      </section>
+
+      <!-- CAROUSEL SET -->
+      <section class="sec" id="setSec" hidden>
+        <div class="sec-h"><span class="ic">🎠</span><h2>轮播套图</h2><span class="tip">4 张一起发</span></div>
+        <div class="field"><label>当前编辑第几张</label>
+          <div class="seg" id="setTabs">
+            <button>封面</button>
+            <button>图 2</button>
+            <button>图 3</button>
+            <button>图 4</button>
+          </div>
+        </div>
+        <div class="hint" id="setCoverHint" style="margin-top:0">封面用下面的「文案钩子」主标题，负责吸引点击。</div>
+        <div class="field" id="setCapField" hidden><label>这张的小标题</label><input type="text" id="setCap" maxlength="24" placeholder="例：细节实拍 🔍"></div>
+        <div class="hint">每张可放自己的照片，品牌、配色、价格全套统一。发帖时 4 张一起上传成相册帖。</div>
+        <button class="btn btn-primary" id="dlSetBtn" style="margin-top:12px">⬇ 下载全部 4 张</button>
+      </section>
+
+      <!-- CHAT (t4) -->
+      <section class="sec" id="chatSec" hidden>
+        <div class="sec-h"><span class="ic">💬</span><h2>聊天内容</h2><span class="tip">像朋友在推荐</span></div>
+        <div class="row">
+          <div class="field"><label>群名</label><input type="text" id="chTitleIn" maxlength="18" placeholder="好物分享群 🔥"></div>
+          <div class="field"><label>成员行</label><input type="text" id="chSubIn" maxlength="24" placeholder="你、Amy、Mei 和 45 人"></div>
+        </div>
+        <div class="field"><label>朋友问</label><input type="text" id="chM1In" maxlength="40" placeholder="姐！上次你说的那个还有货吗？？"></div>
+        <div class="field"><label>你的回复 <span class="soft">（配产品照片）</span></label><input type="text" id="chM2In" maxlength="40" placeholder="有！！Shopee 促销中 才 RM9.90 😍"></div>
+        <div class="field"><label>朋友反应</label><input type="text" id="chM3In" maxlength="40" placeholder="快发我！我也要买 🥳"></div>
+        <div class="hint">链接气泡里的网址自动取自最下方「FB 文案」的带货链接。</div>
+      </section>
+
+      <!-- PHOTO -->
+      <section class="sec">
+        <div class="sec-h"><span class="ic">📷</span><h2>产品照片</h2><span class="tip">拖进画布 / 粘贴都行</span></div>
+        <div class="field" id="layoutField"><label>插图排版 <span class="soft">同一个模板 4 种玩法</span></label>
+          <div class="seg lay" id="layoutSeg">
+            <button data-lay="1"><svg viewBox="0 0 34 24"><rect x="0" y="0" width="34" height="24" rx="3"></rect></svg>单图</button>
+            <button data-lay="2"><svg viewBox="0 0 34 24"><rect x="0" y="0" width="16" height="24" rx="2"></rect><rect x="18" y="0" width="16" height="24" rx="2"></rect></svg>双图</button>
+            <button data-lay="3"><svg viewBox="0 0 34 24"><rect x="0" y="0" width="19" height="24" rx="2"></rect><rect x="21" y="0" width="13" height="11" rx="2"></rect><rect x="21" y="13" width="13" height="11" rx="2"></rect></svg>三图</button>
+            <button data-lay="4"><svg viewBox="0 0 34 24"><rect x="0" y="0" width="16" height="11" rx="2"></rect><rect x="18" y="0" width="16" height="11" rx="2"></rect><rect x="0" y="13" width="16" height="11" rx="2"></rect><rect x="18" y="13" width="16" height="11" rx="2"></rect></svg>四宫格</button>
+          </div>
+        </div>
+        <div id="gridPhoto">
+          <div class="gridslots" id="slotList">
+            <div class="gslot" id="gslot0"><button class="gthumb" id="gthumb0" data-i="0"></button><div class="grow"><div class="glabel">照片 1</div><input type="range" class="gzoom" id="gzoom0" data-i="0" min="100" max="280" value="100"></div><button class="gclear" id="gclear0" data-i="0" title="清除" style="display:none">×</button></div>
+            <div class="gslot" id="gslot1"><button class="gthumb" id="gthumb1" data-i="1"></button><div class="grow"><div class="glabel">照片 2</div><input type="range" class="gzoom" id="gzoom1" data-i="1" min="100" max="280" value="100"></div><button class="gclear" id="gclear1" data-i="1" title="清除" style="display:none">×</button></div>
+            <div class="gslot" id="gslot2"><button class="gthumb" id="gthumb2" data-i="2"></button><div class="grow"><div class="glabel">照片 3</div><input type="range" class="gzoom" id="gzoom2" data-i="2" min="100" max="280" value="100"></div><button class="gclear" id="gclear2" data-i="2" title="清除" style="display:none">×</button></div>
+            <div class="gslot" id="gslot3"><button class="gthumb" id="gthumb3" data-i="3"></button><div class="grow"><div class="glabel">照片 4</div><input type="range" class="gzoom" id="gzoom3" data-i="3" min="100" max="280" value="100"></div><button class="gclear" id="gclear3" data-i="3" title="清除" style="display:none">×</button></div>
+          </div>
+          <input type="file" id="gridFileInput" accept="image/*" hidden>
+          <div class="hint">点格子上传 — 不同角度、细节、或搭配使用场景。画布里可拖动调位置。</div>
+        </div>
+        <div id="singlePhoto" hidden>
+          <button class="btn btn-ghost" id="uploadBtn">📷 上传照片</button>
+          <input type="file" id="fileInput" accept="image/*" hidden>
+          <button class="btn btn-ghost" id="removeBtn" style="margin-top:9px;display:none">🗑 移除照片</button>
+          <div id="photoTools" style="display:none">
+            <div class="field" style="margin-top:14px"><label>放大 <span class="soft">· 拖动照片可调位置</span></label>
+              <div class="slider-row"><input type="range" id="zoom" min="100" max="280" value="100"><span class="val" id="zoomVal">100%</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="samples"><span>试一试：</span><button id="sampleRam">🍜 拉面</button><button id="sampleToy">🧸 玩具</button></div>
+        <div class="field" id="scrimField" style="margin-top:14px;margin-bottom:0"><label>照片压暗 <span class="soft">让文字更突出</span></label>
+          <div class="slider-row"><input type="range" id="scrimIn" min="0" max="80" value="24"><span class="val" id="scrimVal">24%</span></div>
+        </div>
+      </section>
+
+      <!-- COPY -->
+      <section class="sec">
+        <div class="sec-h"><span class="ic">✍️</span><h2>文案钩子</h2>
+          <div class="seg seg-mini" id="langSeg" style="margin-left:auto">
+            <button data-lang="zh">中文</button>
+            <button data-lang="mix">中英 Mix</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>一键灵感 <span class="soft">按点击心理分类</span></label>
+          <div class="hooks" id="hooksBox"></div>
+        </div>
+        <div class="field"><label>主标题 <span class="soft">（按 Enter 换行）</span></label><textarea id="l1text" rows="2"></textarea>
+          <div class="swatches" data-target="1"></div>
+        </div>
+        <div class="field"><label>副标题</label><textarea id="l2text" rows="1"></textarea>
+          <div class="swatches" data-target="2"></div>
+        </div>
+        <div class="field"><label>描边颜色 <span class="soft">你的招牌白边</span></label><div class="swatches" data-target="ol"></div></div>
+        <div class="field"><label>字号</label>
+          <div class="slider-row"><input type="range" id="textSize" min="70" max="140" value="100"><span class="val" id="textSizeVal">100%</span></div>
+        </div>
+        <div class="row">
+          <div class="field" style="margin-bottom:0"><label>字体</label>
+            <select id="fontSel">
+              <option value='"Noto Sans SC","Nunito"'>力量黑体（招牌）</option>
+              <option value='"Baloo 2","Noto Sans SC"'>圆润可爱</option>
+              <option value='"Ma Shan Zheng","Noto Sans SC"'>手写涂鸦</option>
+              <option value='"Montserrat","Noto Sans SC"'>简约现代</option>
+              <option value='"Anton","Noto Sans SC"'>冲击力</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;flex:none;width:128px"><label>对齐</label>
+            <div class="seg" id="alignSeg">
+              <button data-align="left" title="左">◤</button>
+              <button data-align="center" title="中">▬</button>
+              <button data-align="right" title="右">◥</button>
+            </div>
+          </div>
+        </div>
+        <div class="field" style="margin-top:15px">
+          <div class="toggle-row"><label>荧光笔高亮</label><button class="toggle" id="hlToggle"></button></div>
+          <div class="sub" id="hlSub" hidden><div class="swatches" data-target="hl"></div></div>
+        </div>
+      </section>
+
+      <!-- COUNTDOWN (t3) -->
+      <section class="sec" id="cdSec" hidden>
+        <div class="sec-h"><span class="ic">⏰</span><h2>倒计时 + 库存</h2><span class="tip">紧迫感</span></div>
+        <div class="field"><label>剩余时间 <span class="soft">时 : 分 : 秒</span></label>
+          <div class="row cdrow">
+            <input type="text" id="cdHIn" maxlength="2" placeholder="02">
+            <input type="text" id="cdMIn" maxlength="2" placeholder="47">
+            <input type="text" id="cdSIn" maxlength="2" placeholder="19">
+          </div>
+        </div>
+        <div class="field"><label>库存文字</label><input type="text" id="stockTxtIn" maxlength="20" placeholder="只剩最后 37 件"></div>
+        <div class="field" style="margin-bottom:0"><label>已抢进度</label>
+          <div class="slider-row"><input type="range" id="stockPctIn" min="10" max="99" value="82"><span class="val" id="stockPctVal">82%</span></div>
+        </div>
+      </section>
+
+      <!-- REVIEW (t5) -->
+      <section class="sec" id="rvSec" hidden>
+        <div class="sec-h"><span class="ic">⭐</span><h2>好评内容</h2><span class="tip">别人说的才可信</span></div>
+        <div class="field"><label>买家评语</label><textarea id="rbQuoteIn" rows="2" maxlength="60" placeholder="真的好用，已经回购第 3 次了！"></textarea></div>
+        <div class="field" style="margin-bottom:0"><label>署名</label><input type="text" id="rbAuthorIn" maxlength="16" placeholder="— 真实买家"></div>
+      </section>
+
+      <!-- CONVERSION -->
+      <section class="sec cv">
+        <div class="sec-h"><span class="ic">💥</span><h2>转化要素</h2><span class="tip">点击的关键</span></div>
+
+        <div class="cv-toggle" id="cvPriceRow">
+          <span class="cvl"><span class="e">🔖</span>价格 + 折扣</span>
+          <button class="toggle" id="cvPriceToggle"></button>
+        </div>
+        <div class="sub" id="priceSub">
+          <div class="row">
+            <div class="field" style="margin-bottom:10px"><label>原价</label><input type="text" id="dWasIn" maxlength="14" placeholder="RM 29.90"></div>
+            <div class="field" style="margin-bottom:10px"><label>现价</label><input type="text" id="dNowIn" maxlength="14" placeholder="RM 9.90"></div>
+          </div>
+          <div class="row" style="align-items:flex-end">
+            <div class="field" style="margin-bottom:0"><label>折扣 <span class="soft">空=自动</span></label><input type="text" id="dPctIn" maxlength="8" placeholder="-67%"></div>
+            <div class="field" style="margin-bottom:0"><label>角标文字</label><input type="text" id="sealLabelIn" maxlength="10" placeholder="OFF"></div>
+          </div>
+          <div class="toggle-row" style="margin-top:12px"><label>显示折扣角标 <span class="soft">（爆炸贴）</span></label><button class="toggle" id="sealToggle"></button></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="cv-toggle" id="cvProofRow">
+          <span class="cvl"><span class="e">⭐</span>评分 + 销量</span>
+          <button class="toggle" id="cvProofToggle"></button>
+        </div>
+        <div class="sub" id="proofSub">
+          <div class="row">
+            <div class="field" style="margin-bottom:0"><label>评分</label><input type="text" id="dRateIn" maxlength="4" placeholder="4.9"></div>
+            <div class="field" style="margin-bottom:0"><label>销量</label><input type="text" id="dSoldIn" maxlength="16" placeholder="已售 12k+"></div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="cv-toggle" id="cvVoucherRow">
+          <span class="cvl"><span class="e">🎟</span>折扣码 / 优惠券</span>
+          <button class="toggle" id="cvVoucherToggle"></button>
+        </div>
+        <div class="sub" id="voucherSub"><input type="text" id="dVoucherIn" maxlength="18" placeholder="LEE10"></div>
+
+        <div class="divider"></div>
+
+        <div class="cv-toggle" id="cvCtaRow">
+          <span class="cvl"><span class="e">👉</span>行动号召 (CTA)</span>
+          <button class="toggle" id="cvCtaToggle"></button>
+        </div>
+        <div class="sub" id="ctaSub">
+          <input type="text" id="dCtaIn" maxlength="22" placeholder="评论区拿链接 👇">
+          <div class="hooks sm" id="ctaChips" style="margin-top:9px"></div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="toggle-row" style="margin-bottom:12px"><label>手绘箭头 <span class="soft">指向 CTA</span></label><button class="toggle" id="arrowToggle"></button></div>
+        <div class="toggle-row"><label>Shopee 信任标识</label><button class="toggle" id="shopeeToggle"></button></div>
+      </section>
+
+      <!-- BRAND -->
+      <section class="sec">
+        <div class="sec-h"><span class="ic">🏷️</span><h2>你的品牌</h2></div>
+        <div class="toggle-row" style="margin-bottom:13px"><label>显示品牌徽章</label><button class="toggle" id="badgeToggle"></button></div>
+        <div class="field"><label>徽章样式</label>
+          <div class="seg" id="brandStyleSeg">
+            <button data-bstyle="lee">白圆贴纸</button>
+            <button data-bstyle="pill">胶囊 + 头像</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field" style="flex:none;width:84px"><label>头像字</label><input type="text" id="brandInit" maxlength="2" placeholder="L"></div>
+          <div class="field"><label>名称</label><input type="text" id="brandName" maxlength="14" placeholder="LEE"></div>
+        </div>
+        <div class="field"><label>标语</label><input type="text" id="brandTag" maxlength="16" placeholder="Sharing"></div>
+        <div class="field" style="margin-bottom:0"><label>徽章点缀色</label><div class="swatches" data-target="badge"></div></div>
+        <div class="field collapse" id="bgField" hidden style="margin-top:15px"><label>背景色 <span class="soft">（奶油底模板）</span></label><div class="swatches" data-target="bg"></div></div>
+      </section>
+
+      <!-- EXPORT -->
+      <section class="sec">
+        <button class="btn btn-primary" id="downloadBtn2" onclick="document.getElementById('downloadBtn').click()">⬇ 下载海报 (1080×1080)</button>
+        <button class="btn btn-ghost" id="resetBtn" style="margin-top:10px">恢复默认</button>
+        <div class="hint">所有改动会自动保存在这个浏览器里。</div>
+      </section>
+
+      <!-- CAPTION -->
+      <section class="sec">
+        <div class="sec-h"><span class="ic">💬</span><h2>Facebook 文案</h2><span class="tip">链接策略</span></div>
+        <div class="field"><label>链接放哪里 <span class="soft">帖子带链接会被 FB 降触及</span></label>
+          <div class="seg" id="linkModeSeg">
+            <button data-mode="comment">第一条评论 ✅</button>
+            <button data-mode="direct">直接放帖子里</button>
+          </div>
+        </div>
+        <div class="field"><label>产品名称</label><input type="text" id="capName" placeholder="例：辛拉面甜辣炒面"></div>
+        <div class="field"><label>带货链接 <span class="soft">（你的 affiliate link）</span></label><input type="text" id="capLink" placeholder="https://s.shopee.com.my/你的链接"></div>
+        <div class="row">
+          <div class="field"><label>价格 <span class="soft">选填</span></label><input type="text" id="capPrice" placeholder="RM 9.90"></div>
+          <div class="field"><label>折扣码 <span class="soft">选填</span></label><input type="text" id="capCode" placeholder="LEE10"></div>
+        </div>
+        <div class="field"><label>话题标签</label><input type="text" id="capTags" placeholder="#shopee #好物分享"></div>
+        <div class="field">
+          <div class="toggle-row" style="margin-bottom:8px"><label>① 帖子主文案</label>
+            <button class="btn btn-ghost btn-sm" id="capRebuild">↻ 重新生成</button>
+          </div>
+          <textarea id="capOut" rows="8" style="min-height:150px;font-size:14px"></textarea>
+        </div>
+        <button class="btn btn-primary" id="copyBtn">📋 复制主文案</button>
+        <div class="field" id="capCommentField" style="margin-top:16px">
+          <div class="toggle-row" style="margin-bottom:8px"><label>② 发完贴，马上评论这条 <span class="soft">（链接在这）</span></label></div>
+          <textarea id="capOut2" rows="4" style="min-height:90px;font-size:14px"></textarea>
+        </div>
+        <button class="btn btn-ghost" id="copyBtn2">📋 复制评论（含链接）</button>
+        <div class="hint">先发帖（不带链接触及更高）→ 立刻把 ② 贴到第一条评论并置顶。</div>
+      </section>
+
+    </aside>
+  </div>
+
+<script src="post-studio-v3.js"></script>
+</body>
+</html>

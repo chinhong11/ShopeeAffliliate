@@ -1,0 +1,20 @@
+{
+  "timezone": "Asia/Kuala_Lumpur",
+  "collectAt": "08:00",
+  "postTimes": ["12:30", "20:30"],
+  "jitterMinutes": 10,
+  "postsPerDay": 2,
+  "language": "zh",
+  "linkMode": "comment",
+  "brand": { "bstyle": "lee", "bInit": "L", "bName": "LEE", "bTag": "Sharing", "badgec": "#1c1c1e" },
+  "voucherCode": "",
+  "hashtags": "#shopee #好物分享 #开箱",
+  "noRepeatDays": 30,
+  "categories": [],
+  "strategies": {
+    "topSellers": { "enabled": true, "perDay": 2 },
+    "highestCommission": { "enabled": true, "perDay": 2 },
+    "biggestDiscount": { "enabled": true, "perDay": 2 }
+  },
+  "filters": { "minRating": 4.7, "minSales": 500, "excludeKeywords": [] }
+}
