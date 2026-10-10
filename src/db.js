@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS drafts (
   item_id TEXT NOT NULL,
   shop_id TEXT NOT NULL,
   strategy TEXT NOT NULL,            -- top | com | disc
-  status TEXT NOT NULL DEFAULT 'draft', -- draft | approved | skipped | expired | posted
+  status TEXT NOT NULL DEFAULT 'draft', -- draft | approved | skipped | expired | posting | posted | failed
   product TEXT NOT NULL,             -- JSON (mapping.productFromOffer + img)
   form TEXT NOT NULL,                -- JSON (tpl, l1, l2, photos, used, review, flash, chat, cap1, cap2, …)
   short_link TEXT,
@@ -108,7 +108,7 @@ export const drafts = {
     db.prepare(`UPDATE drafts SET ${sets.join(',')} WHERE id=@_id`).run({ ...vals, _id: id });
   },
   /* item already pending / approved */
-  queuedItem: itemId => !!db.prepare("SELECT 1 FROM drafts WHERE item_id=? AND status IN ('draft','approved')").get(String(itemId)),
+  queuedItem: itemId => !!db.prepare("SELECT 1 FROM drafts WHERE item_id=? AND status IN ('draft','approved','posting','failed')").get(String(itemId)),
   /* item posted within the last `days` days */
   postedWithin: (itemId, days) => !!db.prepare("SELECT 1 FROM posts WHERE item_id=? AND kind='posted' AND at>=?").get(String(itemId), Date.now() - days * 86400e3),
   shopsOnDay: day => new Set(db.prepare('SELECT shop_id FROM drafts WHERE collected_day=?').all(day).map(r => r.shop_id))

@@ -29,6 +29,7 @@ export const env = {
   FB_PAGE_ID: e.FB_PAGE_ID || '',
   FB_PAGE_TOKEN: e.FB_PAGE_TOKEN || '',
   FB_GRAPH_VERSION: e.FB_GRAPH_VERSION || 'v26.0',
+  FB_GRAPH_BASE: (e.FB_GRAPH_BASE || 'https://graph.facebook.com').replace(/\/$/, ''), // tests point this at a local fake
   ADMIN_PASSWORD: e.ADMIN_PASSWORD || '',
   SESSION_SECRET: e.SESSION_SECRET || '',
   PUBLIC_URL: (e.PUBLIC_URL || '').replace(/\/$/, ''),

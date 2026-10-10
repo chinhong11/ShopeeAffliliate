@@ -10,6 +10,8 @@ import * as svc from './service.js';
 import { todayView } from './slots.js';
 import { posterKey, studioState, STRATS, TPL } from './mapping.js';
 import { thumbFile, posterFile, closeBrowser } from './render.js';
+import * as fb from './facebook.js';
+import * as publish from './publish.js';
 import { loginView } from './views/login.js';
 import { queueView } from './views/queue.js';
 import { editView } from './views/edit.js';
@@ -163,16 +165,21 @@ api.get('/drafts/:id/studio-state', wrap(req => {
   if (!d) throw new Error('草稿不存在');
   return studioState(d, loadConfig(), ref => '/img/' + encodeURIComponent(ref.replace(/^\w+:/, '')));
 }));
-/* Step 5 / 6 fill these in */
-export const hooks = { tokenRetry: async () => { svc.pause.clear(); return { ok: true }; }, retryPost: async () => { throw new Error('发布模块还没装好'); } };
-api.post('/token', wrap(() => hooks.tokenRetry()));
-api.post('/posts/:id/retry', wrap(req => hooks.retryPost(Number(req.params.id))));
+/* 重试 on the Token banner: debug_token must pass before publishing resumes */
+api.post('/token', wrap(async () => {
+  const r = await fb.checkToken();
+  if (r.ok) { svc.pause.clear(); return { ok: true }; }
+  svc.pause.set(r.error ? r.error.code : 190, 'Facebook token 有问题：' + r.problems.join('；') + '。到 Meta 重新生成 Page token，更新到服务器设置后点「重试」。批准的帖子会继续排队。');
+  return { ok: false, error: r.problems.join('；') };
+}));
+api.post('/posts/:id/retry', wrap(req => publish.retryPost(Number(req.params.id))));
 app.use('/api', api);
 
 app.use((req, res) => res.status(404).send('Not found'));
 
 /* ---------- start ---------- */
 export async function start() {
+  publish.recoverInterrupted();
   /* posters missing after a restart / collect from the CLI */
   const cfg = loadConfig();
   const stale = [...drafts.list('draft'), ...drafts.list('approved')].filter(d => !svc.posterFresh(d, cfg) && !d.posterError).map(d => d.id);
