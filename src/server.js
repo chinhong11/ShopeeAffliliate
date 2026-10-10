@@ -12,6 +12,7 @@ import { posterKey, studioState, STRATS, TPL } from './mapping.js';
 import { thumbFile, posterFile, closeBrowser } from './render.js';
 import * as fb from './facebook.js';
 import * as publish from './publish.js';
+import { startJobs, stopJobs } from './jobs.js';
 import { loginView } from './views/login.js';
 import { queueView } from './views/queue.js';
 import { editView } from './views/edit.js';
@@ -185,7 +186,8 @@ export async function start() {
   const stale = [...drafts.list('draft'), ...drafts.list('approved')].filter(d => !svc.posterFresh(d, cfg) && !d.posterError).map(d => d.id);
   if (stale.length) svc.queuePosters(stale);
   const srv = app.listen(env.PORT, () => console.log(`review app on http://localhost:${env.PORT}${env.SHOPEE_MOCK ? ' (SHOPEE_MOCK)' : ''}`));
-  const stop = async () => { console.log('shutting down'); srv.close(); await closeBrowser(); process.exit(0); };
+  if (process.env.DISABLE_JOBS !== '1') startJobs();
+  const stop = async () => { console.log('shutting down'); stopJobs(); srv.close(); await closeBrowser(); process.exit(0); };
   process.on('SIGTERM', stop); process.on('SIGINT', stop);
   return srv;
 }
