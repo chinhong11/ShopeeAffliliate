@@ -1,0 +1,24 @@
+{
+  "name": "shopee-fb-autopost",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shopee Affiliate → Facebook Page auto-poster with a review app",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "collect": "node src/collect.js",
+    "publish-due": "node src/publish.js",
+    "render-test": "node scripts/render-test.js",
+    "backup": "node src/backup.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "croner": "^9.1.0",
+    "express": "^5.1.0",
+    "html-to-image": "1.11.11",
+    "playwright": "1.56.1"
+  }
+}
