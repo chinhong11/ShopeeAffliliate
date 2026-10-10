@@ -1,0 +1,26 @@
+/* real-app glue on top of design/review-app.css (the design ran inside device frames) */
+html,body{height:100%;margin:0}
+body{background:var(--bg);-webkit-tap-highlight-color:transparent}
+.rv{height:100vh;height:100dvh}
+.rv a.tab,.rv a.btn,.rv a.qt,.rv a.slot,.rv a.back,.rv a.pv{text-decoration:none;color:inherit}
+.rv a.btn{display:flex;align-items:center;justify-content:center}
+.rv a.pv{display:block}
+.rv .btn-ghost{color:var(--text)}
+.rv .btn-primary{color:#fff}
+.phone .rv-head{padding-top:calc(16px + env(safe-area-inset-top))}
+.phone .ed-top{padding-top:calc(10px + env(safe-area-inset-top))}
+.phone .tabs{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+.phone .ed-bar{padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+.rv.phone .topnav,.rv.phone .desk-only{display:none}
+.rv.desk .tabs{display:none}
+.rv:has(.ed) .tabs{display:none}
+.phone .toast{bottom:calc(92px + env(safe-area-inset-bottom))}
+.rv:has(.ed).phone .toast{bottom:calc(90px + env(safe-area-inset-bottom))}
+.rv .login{flex:1}
+.login .hint{margin-top:16px;font-size:12px;color:var(--muted-2);font-weight:600;text-align:center}
+.pvw[data-pending] img{filter:brightness(.6)}
+.ed-meta .desk-only{margin-top:14px}
+.phs .ph{background-color:var(--panel-2)}
+.err-inline{margin-top:10px;font-size:12.5px;font-weight:800;color:var(--dealt)}
+/* review-app.css's generic .empty (empty-queue box) also matches .slot.empty; keep slots compact */
+.slot.empty{margin:0;padding:11px 12px 12px;display:block;text-align:left}
