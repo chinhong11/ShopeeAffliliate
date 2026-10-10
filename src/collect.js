@@ -4,7 +4,7 @@ import { loadConfig, env } from './config.js';
 import { drafts, kv, newDraftId, dayStr, ymd } from './db.js';
 import * as shopee from './shopee.js';
 import { productFromOffer, STRAT_CODE } from './mapping.js';
-import { newForm } from './draft.js';
+import { newForm, withCaptions } from './draft.js';
 
 export const STRATEGY_ORDER = ['topSellers', 'highestCommission', 'biggestDiscount'];
 
@@ -90,7 +90,7 @@ export async function collect({ log = console.log } = {}) {
       const form = newForm({ p, strat }, cfg, pickState);
       const subIds = shopee.cleanSubIds(['fb', form.tpl, strat, stamp, id]);
       const shortLink = await shopee.shortLink(p.productLink || p.offerLink, subIds);
-      const d = { id, itemId: p.itemId, shopId: p.shopId, strat, p, form, shortLink, subIds, collectedDay: today };
+      const d = withCaptions({ id, itemId: p.itemId, shopId: p.shopId, strat, p, form, shortLink, subIds, collectedDay: today }, cfg);
       drafts.insert(d);
       created.push(d);
       log(`  + ${id} ${strat} ${form.tpl} ${p.name.slice(0, 40)} · RM ${p.price} · -${p.disc}% · ★${p.rating} · ${p.sales} sold`);
