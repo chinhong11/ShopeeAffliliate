@@ -7,6 +7,7 @@ import { planDay } from './slots.js';
 import { publishDue } from './publish.js';
 import { checkToken } from './facebook.js';
 import { runCollect, pause } from './service.js';
+import { backup } from './backup.js';
 
 const log = (...a) => console.log(new Date().toISOString(), '[jobs]', ...a);
 const jobs = [];
@@ -60,12 +61,13 @@ export function startJobs() {
     new Cron(`${cm} ${ch} * * *`, opt, lead(() => { log('collect'); runCollect(); })),
     new Cron('5 0 * * *', opt, lead(daily)),
     new Cron('*/5 * * * *', opt, tick),
+    new Cron('30 3 * * *', opt, lead(() => backup({ log }))),
     new Cron(`${(cm + 50) % 60} ${(ch + 23 + Math.floor((cm + 50) / 60)) % 24} * * *`, opt, lead(tokenCheck)) // 10 min before collect
   );
   setInterval(holdLease, 60e3).unref(); // keep the lease fresh while we hold it
   if (holdLease()) { daily(); tokenCheck().catch(e => log('token check:', e.message)); setTimeout(tick, 5000).unref(); }
   else log('another instance holds the scheduler lease; jobs idle here');
-  log(`scheduled (${tz}): collect ${cfg.collectAt}, plan 00:05, publish every 5 min, token check daily`);
+  log(`scheduled (${tz}): collect ${cfg.collectAt}, plan 00:05, publish every 5 min, backup 03:30, token check daily`);
   return jobs;
 }
 export const stopJobs = () => { jobs.forEach(j => j.stop()); jobs.length = 0; };

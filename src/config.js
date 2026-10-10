@@ -62,10 +62,6 @@ export function loadConfig() {
   };
 }
 
-export function saveConfig(c) {
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(c, null, 2) + '\n');
-}
-
 export const dirs = {
   data: env.DATA_DIR,
   img: path.join(env.DATA_DIR, 'img'),

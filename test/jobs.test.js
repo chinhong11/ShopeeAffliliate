@@ -50,13 +50,25 @@ test('drafts not approved within 3 days expire', () => {
   assert.equal(db.prepare('SELECT status FROM drafts WHERE id=?').get('dappr').status, 'approved');
 });
 
-test('scheduler: collect 08:00, 00:05, every 5 min, token check 07:50 (Asia/Kuala_Lumpur)', () => {
+test('scheduler: collect 08:00, 00:05, every 5 min, backup 03:30, token check 07:50 (Asia/Kuala_Lumpur)', () => {
   const list = jobs.startJobs();
   const fmt = d => d.toLocaleString('en-GB', { timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', minute: '2-digit', hour12: false });
-  const [collect, plan, every5, token] = list.map(j => j.nextRun());
+  const [collect, plan, every5, bak, token] = list.map(j => j.nextRun());
+  assert.equal(fmt(bak), '03:30');
   assert.equal(fmt(collect), '08:00');
   assert.equal(fmt(plan), '00:05');
   assert.ok(every5 - Date.now() <= 5 * 60e3);
   assert.equal(fmt(token), '07:50');
   jobs.stopJobs();
+});
+
+test('backup keeps the newest 7', async () => {
+  const { backup } = await import('../src/backup.js');
+  const { dirs } = await import('../src/config.js');
+  for (let i = 1; i <= 9; i++) fs.writeFileSync(path.join(dirs.backup, `app-2020-01-0${i}.db`), 'x');
+  const f = await backup({ log: () => {} });
+  const left = fs.readdirSync(dirs.backup).sort();
+  assert.equal(left.length, 7);
+  assert.equal(left[6], path.basename(f));
+  assert.ok(!left.includes('app-2020-01-01.db'));
 });

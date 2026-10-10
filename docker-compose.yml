@@ -1,0 +1,14 @@
+# Small VPS: `docker compose up -d --build`. Exactly one instance; data lives in ./data.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      TZ: Asia/Kuala_Lumpur
+    ports:
+      - "4545:4545"
+    volumes:
+      - ./data:/data
+    mem_limit: 1g
