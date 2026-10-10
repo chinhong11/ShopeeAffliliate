@@ -130,3 +130,7 @@ export function placeholderProblems(live, patch) {
   if (live.tpl === 't4' && !(live.chat && live.chat.m1 && live.chat.m2 && live.chat.m3)) bad.push('t4 without chat lines');
   return bad;
 }
+
+/* poster cache key: the studio state the poster is rendered from (countdown time excluded) */
+export function hash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + '_' + s.length; }
+export const posterKey = (d, cfg) => hash(JSON.stringify(studioState({ ...d, nowMinutes: 0 }, cfg)));
