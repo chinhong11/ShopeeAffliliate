@@ -13,6 +13,7 @@ import { thumbFile, posterFile, closeBrowser } from './render.js';
 import * as fb from './facebook.js';
 import * as publish from './publish.js';
 import { startJobs, stopJobs } from './jobs.js';
+import * as telegram from './telegram.js';
 import { loginView } from './views/login.js';
 import { queueView } from './views/queue.js';
 import { editView } from './views/edit.js';
@@ -53,9 +54,8 @@ app.post('/login', express.urlencoded({ extended: false, limit: '4kb' }), (req, 
 });
 app.post('/logout', (req, res) => res.set('Set-Cookie', clearCookie()).redirect('/login'));
 
-/* Step 7 mounts /telegram/:secret here (public, secret in the path) */
-export const publicRouter = express.Router();
-app.use(publicRouter);
+/* Telegram webhook (public; secret in the path + header) */
+app.use(telegram.router);
 
 /* ---------- everything else needs the login ---------- */
 app.use((req, res, next) => {
@@ -186,6 +186,7 @@ export async function start() {
   const stale = [...drafts.list('draft'), ...drafts.list('approved')].filter(d => !svc.posterFresh(d, cfg) && !d.posterError).map(d => d.id);
   if (stale.length) svc.queuePosters(stale);
   const srv = app.listen(env.PORT, () => console.log(`review app on http://localhost:${env.PORT}${env.SHOPEE_MOCK ? ' (SHOPEE_MOCK)' : ''}`));
+  if (telegram.init({ onCollected: svc.onCollected, onPublishEvent: publish.onPublishEvent, onPause: svc.onPause })) console.log('telegram on');
   if (process.env.DISABLE_JOBS !== '1') startJobs();
   const stop = async () => { console.log('shutting down'); stopJobs(); srv.close(); await closeBrowser(); process.exit(0); };
   process.on('SIGTERM', stop); process.on('SIGINT', stop);

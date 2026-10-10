@@ -141,9 +141,15 @@ export function savePhoto(id, dataUrl) {
 }
 
 /* posting pause (Facebook token / rate-limit problems) */
+const pauseListeners = [];
+export const onPause = fn => pauseListeners.push(fn);
 export const pause = {
   get: () => kv.get('publishPaused'),
-  set: (code, message) => kv.set('publishPaused', { code, message, at: Date.now() }),
+  set(code, message) {
+    const old = kv.get('publishPaused'), p = { code, message, at: Date.now() };
+    kv.set('publishPaused', p);
+    if (!old || old.message !== message) pauseListeners.forEach(fn => { try { fn(p); } catch (e) { console.error(e.message); } });
+  },
   clear: () => kv.del('publishPaused')
 };
 
