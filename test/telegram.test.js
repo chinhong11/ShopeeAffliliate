@@ -77,3 +77,17 @@ test('✅ 批准 approves, ❌ 跳过 skips; other chats are ignored', async () 
   await hook(SECRET, SECRET, cb('sk:' + b.id)); await settle();
   assert.equal(drafts.get(b.id).status, 'skipped');
 });
+
+test('reminder before an empty posting time and the pause message reach the chat in plain words', async () => {
+  const svc = await import('../src/service.js');
+  telegram.init({ onCollected: () => {}, onCollectFailed: () => {}, onPublishEvent: () => {}, onPause: svc.onPause, onReminder: svc.onReminder });
+  await settle();
+  calls.length = 0;
+  svc.remind({ label: '20:30', plannedAt: new Date(2032, 0, 1, 20, 34).getTime(), pending: 3 });
+  svc.pause.set(190, svc.pauseText(190, ['token 无效']), 'token', svc.fbWords('Facebook 错误 190: Error validating access token: Session has expired.'));
+  await settle();
+  const texts = calls.filter(c => c.url.endsWith('/sendMessage')).map(c => JSON.parse(c.body).text);
+  assert.ok(texts.some(t => t.startsWith('⏰ 20:30') && t.includes('约 20:34') && t.includes('还有 3 张草稿') && t.includes('https://app.example.com')), texts.join('\n---\n'));
+  assert.ok(texts.some(t => t.startsWith('🛑 发布已暂停') && t.includes('Facebook token 有问题：token 无效') && t.includes('Facebook 原话：Error validating access token: Session has expired\n')), texts.join('\n---\n'));
+  svc.pause.clear();
+});
