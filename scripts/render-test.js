@@ -1,6 +1,7 @@
 /* README Step 3 acceptance test: render studio/samples/ramen.png with t1 t2 t5 t6 at every layout through the
    automation path (PostStudio.load + exportPng) and compare each with the studio's own ⬇ 下载海报 button export
-   of the same state. Writes $DATA_DIR/render-test/{tpl}-{layout}.png and contact.png. `npm run render-test` */
+   of the same state; also t3 / t4 and the four t8 pages (vs ⬇ 下载全部 4 张), since the renderer embeds only the
+   font slices a poster uses. Writes $DATA_DIR/render-test/{tpl}-{layout}.png and contact.png. `npm run render-test` */
 import fs from 'node:fs';
 import path from 'node:path';
 import { dirs, ROOT } from '../src/config.js';
@@ -26,6 +27,9 @@ for (const tpl of ['t1', 't2', 't5', 't6']) for (let layout = 1; layout <= 4; la
   if (tpl === 't5') st.review = { quote: '（测试用评价）面很Q，辣度刚好', author: '— 测试' };
   cases.push(st);
 }
+cases.push({ ...base, tpl: 't3', layout: 1, photos: [ramen], cd: { h: '05', m: '42', s: '07' }, stockTxt: '限时闪购中', stockPct: 64 });
+cases.push({ ...base, tpl: 't4', layout: 1, photos: [ramen], chat: { title: '好物分享群 🔥', sub: '群聊', m1: '（测试）这个辣不辣？', m2: '微辣，配蛋超好吃', m3: '我也要链接！' } });
+const setCase = { ...base, tpl: 't8', layout: 1, photos: [ramen], set: { pages: [0, 1, 2, 3].map(i => ({ src: ramen, cap: ['', '为什么值得买 ✅', '细节实拍 🔍', '怎么下单 👇'][i] })) } };
 
 async function buttonExport(state) {
   const page = await openStudio({ fresh: true });
@@ -33,6 +37,21 @@ async function buttonExport(state) {
     await page.evaluate(s => window.PostStudio.load(s), state);
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#downloadBtn')]);
     return fs.readFileSync(await dl.path());
+  } finally { await page.close(); }
+}
+/* t8: the studio's ⬇ 下载全部 4 张 button → its 4 downloads */
+async function buttonExportSet(state) {
+  const page = await openStudio({ fresh: true });
+  try {
+    await page.evaluate(s => window.PostStudio.load(s), state);
+    const files = [];
+    const got = new Promise((res, rej) => {
+      page.on('download', async dl => { files.push(fs.readFileSync(await dl.path())); if (files.length === 4) res(); });
+      setTimeout(() => rej(new Error('set download timeout')), 240000);
+    });
+    await page.click('#dlSetBtn');
+    await got;
+    return files;
   } finally { await page.close(); }
 }
 
@@ -87,7 +106,22 @@ for (const st of cases) {
   if (!ok) fail++;
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}  ${d.size}  changed ${(d.changed * 100).toFixed(3)}%  mean Δ ${d.mean.toFixed(3)}  ${Date.now() - t} ms`);
 }
-await contactSheet(files);
-console.log(`\n${cases.length - fail}/${cases.length} identical to the studio export · ${path.join(OUT, 'contact.png')}`);
+{
+  const t = Date.now();
+  const { set } = await renderState(setCase, { set: true });
+  const btn = await buttonExportSet(setCase);
+  for (let i = 0; i < 4; i++) {
+    const name = `t8-page${i + 1}`;
+    const f = path.join(OUT, name + '.png');
+    fs.writeFileSync(f, set[i]); files.push(f);
+    const d = await diff(set[i], btn[i]);
+    const ok = d.size === '1080x1080' && d.changed < 0.001;
+    if (!ok) fail++;
+    console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}  ${d.size}  changed ${(d.changed * 100).toFixed(3)}%  mean Δ ${d.mean.toFixed(3)}${i === 3 ? `  ${Date.now() - t} ms` : ''}`);
+  }
+}
+await contactSheet(files.slice(0, 16));
+const total = cases.length + 4;
+console.log(`\n${total - fail}/${total} identical to the studio export · ${path.join(OUT, 'contact.png')}`);
 await closeBrowser();
 process.exit(fail ? 1 : 0);

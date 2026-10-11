@@ -5,17 +5,29 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/* minimal .env loader; real environment variables win */
+/* .env parser (dotenv rules): KEY=value, optional `export `, values trimmed, "quoted" / 'quoted' values kept
+   as written, ` # comment` after an unquoted value dropped */
+export function parseDotEnv(text) {
+  const out = {};
+  for (const line of String(text).split(/\r?\n/)) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/);
+    if (!m) continue; // blank lines and # comments
+    let v = m[2].trim();
+    const q = v[0];
+    if (q === '"' || q === "'") {
+      const end = v.indexOf(q, 1);
+      v = end > 0 ? v.slice(1, end) : v.slice(1);
+      if (q === '"') v = v.replace(/\\n/g, '\n');
+    } else v = v.replace(/(^|\s)#.*$/, '').trim();
+    out[m[1]] = v;
+  }
+  return out;
+}
+/* real environment variables win */
 (function loadDotEnv() {
   const f = path.join(ROOT, '.env');
   if (!fs.existsSync(f)) return;
-  for (const line of fs.readFileSync(f, 'utf8').split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
-    if (!m || line.trim().startsWith('#')) continue;
-    let v = m[2];
-    if (/^(['"]).*\1$/.test(v)) v = v.slice(1, -1);
-    if (process.env[m[1]] === undefined) process.env[m[1]] = v;
-  }
+  for (const [k, v] of Object.entries(parseDotEnv(fs.readFileSync(f, 'utf8')))) if (process.env[k] === undefined) process.env[k] = v;
 })();
 
 const e = process.env;
@@ -70,5 +82,6 @@ export const dirs = {
 };
 for (const d of Object.values(dirs)) fs.mkdirSync(d, { recursive: true });
 
-/* all day/slot math uses local time in the configured timezone */
-if (!process.env.TZ) process.env.TZ = loadConfig().timezone || 'Asia/Kuala_Lumpur';
+/* all day/slot math uses local time in config.timezone — the same zone the scheduler (croner) is given,
+   so a different TZ in the environment (the Dockerfile sets one) can't split them */
+process.env.TZ = loadConfig().timezone || process.env.TZ || 'Asia/Kuala_Lumpur';

@@ -1,25 +1,33 @@
 /* scheduler inside the service (README Step 6). Timezone from config (Asia/Kuala_Lumpur). Exactly one instance. */
 import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Cron } from 'croner';
-import { loadConfig } from './config.js';
+import { loadConfig, dirs } from './config.js';
 import { db, kv, dayStr } from './db.js';
-import { planDay } from './slots.js';
-import { publishDue } from './publish.js';
+import { planDay, toMin, hhmm } from './slots.js';
+import { publishDue, recoverInterrupted } from './publish.js';
 import { checkToken } from './facebook.js';
-import { runCollect, pause } from './service.js';
+import { runCollect, pause, EXPIRE_MS } from './service.js';
 import { backup } from './backup.js';
 
 const log = (...a) => console.log(new Date().toISOString(), '[jobs]', ...a);
 const jobs = [];
-let busy = false;
+let busy = false, leader = false;
 
 /* single-instance lease in the shared DB: a second copy (e.g. during a rolling deploy) stays idle */
 const ME = `${os.hostname()}:${process.pid}`;
 function holdLease() {
   const l = kv.get('jobsLease');
-  if (l && l.owner !== ME && Date.now() - l.at < 3 * 60e3) return false;
+  if (l && l.owner !== ME && Date.now() - l.at < 3 * 60e3) { leader = false; return false; }
   kv.set('jobsLease', { owner: ME, at: Date.now() });
+  if (!leader) { leader = true; recoverInterrupted(); } // just took over: clean up what a dead instance left 'posting'
   return true;
+}
+function releaseLease() {
+  const l = kv.get('jobsLease');
+  if (l && l.owner === ME) kv.del('jobsLease'); // the next instance takes over at once instead of after 3 min
+  leader = false;
 }
 
 export async function tick() {
@@ -30,18 +38,52 @@ export async function tick() {
   finally { busy = false; }
 }
 
+/* README: drafts not approved within 3 days expire (counted from when they last came up for review) */
 export function expireDrafts(now = Date.now()) {
-  const r = db.prepare("UPDATE drafts SET status='expired', updated_at=? WHERE status='draft' AND created_at<?").run(now, now - 3 * 86400e3);
+  const r = db.prepare("UPDATE drafts SET status='expired', updated_at=? WHERE status='draft' AND COALESCE(pending_since, created_at)<?").run(now, now - EXPIRE_MS);
   if (r.changes) log(`expired ${r.changes} drafts not approved within 3 days`);
   return r.changes;
 }
 
-/* invalid token or a missing scope → stop publishing (red banner) */
+/* posters / photos of finished drafts: big PNGs go after 2 days, thumbnails + photos after 30 (the 已发布 tab
+   shows 30 days). Without this a 1 GB volume fills up in about four months. Live drafts keep everything. */
+export function cleanupFiles(now = Date.now()) {
+  const keepAll = new Set(), keepThumb = new Set(), keepImg = new Set();
+  for (const r of db.prepare('SELECT id, status, form, updated_at FROM drafts').all()) {
+    const live = ['draft', 'approved', 'posting', 'failed'].includes(r.status);
+    if (live || r.updated_at >= now - 2 * 86400e3) keepAll.add(r.id);
+    if (live || r.updated_at >= now - 30 * 86400e3) {
+      keepThumb.add(r.id);
+      try { for (const ref of JSON.parse(r.form).photos || []) keepImg.add(String(ref).replace(/^\w+:/, '')); } catch {}
+    }
+  }
+  const old = f => { try { return fs.statSync(f).mtimeMs < now - 86400e3; } catch { return false; } }; // never a file being written now
+  let n = 0;
+  for (const f of fs.readdirSync(dirs.out)) {
+    const m = /^(d[0-9a-f]+)(-[1-4])?\.(png|jpg)$/.exec(f), id = m && m[1];
+    const keep = m && (keepAll.has(id) || (m[3] === 'jpg' && keepThumb.has(id)));
+    if (!keep && old(path.join(dirs.out, f))) { fs.unlinkSync(path.join(dirs.out, f)); n++; }
+  }
+  for (const f of fs.readdirSync(dirs.img)) {
+    if (!keepImg.has(f) && old(path.join(dirs.img, f))) { fs.unlinkSync(path.join(dirs.img, f)); n++; }
+  }
+  if (n) log(`cleanup: removed ${n} old poster / photo files`);
+  return n;
+}
+
+/* invalid token or a missing scope → stop publishing (red banner). If Facebook couldn't be asked at all,
+   nothing is known about the token: no pause, and the daily runner asks again a minute later. */
 export async function tokenCheck() {
   const r = await checkToken();
-  if (r.ok) { log('debug_token ok'); return r; }
+  if (r.ok) {
+    log('debug_token ok');
+    const p = pause.get();
+    if (p && p.source === 'token') { pause.clear(); log('token is valid again: publishing resumed'); }
+    return r;
+  }
+  if (r.transient) { log('debug_token could not be checked, retrying later:', r.problems.join('; ')); return r; }
   log('debug_token problems:', r.problems.join('; '));
-  pause.set(190, 'Facebook token 有问题：' + r.problems.join('；') + '。到 Meta 重新生成 Page token，更新到服务器设置后点「重试」。批准的帖子会继续排队。');
+  pause.set(190, 'Facebook token 有问题：' + r.problems.join('；') + '。到 Meta 重新生成 Page token，更新到服务器设置后点「重试」。批准的帖子会继续排队。', 'token');
   return r;
 }
 
@@ -49,26 +91,47 @@ export function daily() {
   const cfg = loadConfig();
   planDay(dayStr(), cfg);
   expireDrafts();
+  cleanupFiles();
+}
+
+/* daily jobs run at their time — or as soon as possible after it, if the service was down or another instance
+   held the lease then (a deploy at 07:58 must not lose the day's collect). Done-markers live in the DB. */
+const DAILY = [
+  { name: 'daily', at: () => '00:05', run: () => { daily(); return true; } },
+  { name: 'backup', at: () => '03:30', run: async () => { await backup({ log }); return true; } },
+  { name: 'token', at: cfg => hhmm((toMin(cfg.collectAt) + 1430) % 1440), run: async () => !(await tokenCheck()).transient }, // 10 min before collect
+  { name: 'collect', at: cfg => cfg.collectAt, run: () => { log('collect'); runCollect(); return true; } }
+];
+let dailyBusy = false;
+export async function runDailyDue(now = Date.now()) {
+  if (dailyBusy || !holdLease()) return;
+  dailyBusy = true;
+  try {
+    const cfg = loadConfig(), today = dayStr(now), d = new Date(now), mins = d.getHours() * 60 + d.getMinutes();
+    for (const j of DAILY) {
+      if (mins < toMin(j.at(cfg)) || kv.get('jobDone:' + j.name) === today) continue;
+      try { if (await j.run()) kv.set('jobDone:' + j.name, today); }
+      catch (e) { log(`${j.name} failed:`, e.message); }
+    }
+  } finally { dailyBusy = false; }
 }
 
 export function startJobs() {
   const cfg = loadConfig();
   const tz = cfg.timezone || 'Asia/Kuala_Lumpur';
-  const [ch, cm] = cfg.collectAt.split(':').map(Number);
   const opt = { timezone: tz, protect: true, catch: e => log('job error:', e.message) };
-  const lead = fn => () => { if (holdLease()) return fn(); };
   jobs.push(
-    new Cron(`${cm} ${ch} * * *`, opt, lead(() => { log('collect'); runCollect(); })),
-    new Cron('5 0 * * *', opt, lead(daily)),
-    new Cron('*/5 * * * *', opt, tick),
-    new Cron('30 3 * * *', opt, lead(() => backup({ log }))),
-    new Cron(`${(cm + 50) % 60} ${(ch + 23 + Math.floor((cm + 50) / 60)) % 24} * * *`, opt, lead(tokenCheck)) // 10 min before collect
+    new Cron('* * * * *', opt, () => runDailyDue()), // collect / plan / backup / token check, each once a day
+    new Cron('*/5 * * * *', opt, tick)               // due slots → publish
   );
-  setInterval(holdLease, 60e3).unref(); // keep the lease fresh while we hold it
-  if (holdLease()) { daily(); tokenCheck().catch(e => log('token check:', e.message)); setTimeout(tick, 5000).unref(); }
-  else log('another instance holds the scheduler lease; jobs idle here');
+  const keep = setInterval(() => { if (leader) holdLease(); }, 60e3); // keep the lease fresh while we hold it
+  keep.unref(); jobs.push({ stop: () => clearInterval(keep) });
+  if (holdLease()) {
+    tokenCheck().catch(e => log('token check:', e.message));
+    setTimeout(() => runDailyDue().then(tick), 5000).unref();
+  } else log('another instance holds the scheduler lease; jobs idle here until it stops');
   log(`scheduled (${tz}): collect ${cfg.collectAt}, plan 00:05, publish every 5 min, backup 03:30, token check daily`);
   return jobs;
 }
-export const stopJobs = () => { jobs.forEach(j => j.stop()); jobs.length = 0; };
-export const nextRuns = () => jobs.map(j => j.nextRun() && j.nextRun().toISOString());
+export const stopJobs = () => { jobs.forEach(j => j.stop()); jobs.length = 0; releaseLease(); };
+export const nextRuns = () => jobs.filter(j => j.nextRun).map(j => j.nextRun() && j.nextRun().toISOString());

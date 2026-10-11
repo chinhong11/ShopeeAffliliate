@@ -46,7 +46,7 @@ export function makeFilter(cfg, today) {
 export async function collect({ log = console.log } = {}) {
   const cfg = loadConfig();
   if (!cfg.categories || !cfg.categories.length) {
-    throw new Error('config.json "categories" is empty. Add e.g. [{"name":"Home & Living","productCatId":null}] and run again.');
+    throw new Error('config.json 里的 categories 还是空的：先填上要抓的类目，例如 [{"name":"Home & Living","productCatId":null}]');
   }
   const today = dayStr(), stamp = ymd();
   log(`collect ${today}${env.SHOPEE_MOCK ? ' (SHOPEE_MOCK)' : ''}`);
@@ -66,24 +66,11 @@ export async function collect({ log = console.log } = {}) {
   };
 
   const { ok, shops, reasons } = makeFilter(cfg, today);
-  const taken = new Set(), picks = [];
-  for (const key of STRATEGY_ORDER) {
-    const s = cfg.strategies[key];
-    if (!s || !s.enabled) continue;
-    let n = 0;
-    for (const p of lists[key]) {
-      if (n >= (s.perDay || 0)) break;
-      if (taken.has(p.itemId) || !ok(p)) continue;
-      taken.add(p.itemId); shops.add(p.shopId);
-      picks.push({ p, strat: STRAT_CODE[key] }); n++;
-    }
-    log(`  ${key}: ${n}/${s.perDay}`);
-  }
-
-  const created = [];
+  const taken = new Set(), created = [];
   const pickState = kv.get('pickState', { prev: null, rot: {} });
-  for (const { p, strat } of picks) {
-    const id = newDraftId();
+  /* one draft from a candidate; null if its image or short link can't be had (the next candidate takes its place) */
+  async function make(p, strat) {
+    const id = newDraftId(), snap = JSON.stringify(pickState);
     try {
       p.img = await shopee.downloadImage(p.imageUrl, p.itemId);
       if (env.SHOPEE_MOCK) p.mock = true;
@@ -92,11 +79,28 @@ export async function collect({ log = console.log } = {}) {
       const shortLink = await shopee.shortLink(p.productLink || p.offerLink, subIds);
       const d = withCaptions({ id, itemId: p.itemId, shopId: p.shopId, strat, p, form, shortLink, subIds, collectedDay: today }, cfg);
       drafts.insert(d);
-      created.push(d);
       log(`  + ${id} ${strat} ${form.tpl} ${p.name.slice(0, 40)} · RM ${p.price} · -${p.disc}% · ★${p.rating} · ${p.sales} sold`);
+      return d;
     } catch (e) {
+      Object.assign(pickState, JSON.parse(snap)); // template / headline rotation only advances for drafts that exist
       log(`  ! ${p.itemId} skipped: ${e.message}`);
+      return null;
     }
+  }
+  for (const key of STRATEGY_ORDER) {
+    const s = cfg.strategies[key];
+    if (!s || !s.enabled) continue;
+    let n = 0;
+    for (const p of lists[key]) {
+      if (n >= (s.perDay || 0)) break;
+      if (taken.has(p.itemId) || !ok(p)) continue;
+      taken.add(p.itemId);
+      const d = await make(p, STRAT_CODE[key]);
+      if (!d) continue;
+      shops.add(p.shopId);
+      created.push(d); n++;
+    }
+    log(`  ${key}: ${n}/${s.perDay}`);
   }
   kv.set('pickState', pickState);
   const summary = { at: Date.now(), day: today, created: created.length, ids: created.map(d => d.id), filtered: reasons };

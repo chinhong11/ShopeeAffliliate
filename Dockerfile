@@ -18,8 +18,9 @@ ENV TZ=Asia/Kuala_Lumpur \
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# /data is the host's persistent volume (Railway / Render / Fly volume, or compose's ./data:/data).
+# No VOLUME instruction: Railway's builder rejects it, and every host mounts its volume without it.
 RUN mkdir -p /data
-VOLUME /data
 EXPOSE 4545
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||4545)+'/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"

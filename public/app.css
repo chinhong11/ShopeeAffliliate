@@ -24,3 +24,4 @@ body{background:var(--bg);-webkit-tap-highlight-color:transparent}
 .err-inline{margin-top:10px;font-size:12.5px;font-weight:800;color:var(--dealt)}
 /* review-app.css's generic .empty (empty-queue box) also matches .slot.empty; keep slots compact */
 .slot.empty{margin:0;padding:11px 12px 12px;display:block;text-align:left}
+.hsub.err{color:var(--dealt)}

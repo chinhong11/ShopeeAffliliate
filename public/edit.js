@@ -1,7 +1,7 @@
 /* 编辑草稿 */
 import { api, toast, toastNext } from '/static/app.js';
 import { TPL, TPL_NOTE, TPL_LOCK, TPL_ORDER, LAYOUT, posterKey } from '/shared/mapping.js';
-import { suggest, availability, cap1, cap2 } from '/shared/pick.js';
+import { suggest, availability, cap1, cap2, isPersonal } from '/shared/pick.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -135,7 +135,7 @@ el('tps').onclick = e => {
 };
 el('unlock').oninput = e => {
   const t = e.target;
-  if (t.id === 'fe') f.flash.end = t.value;
+  if (t.id === 'fe') { f.flash.end = t.value; f.flash.endAt = 0; } // the server dates the new end time on save
   if (t.id === 'fp') { t.value = t.value.replace(/\D/g, ''); f.flash.pct = t.value; }
   if (t.dataset.chat) f.chat[t.dataset.chat] = t.value;
   changed();
@@ -149,7 +149,12 @@ el('c2').oninput = e => { f.cap2 = e.target.value; f.cap2Manual = true; el('rebu
 el('rebuild').onclick = () => { f.cap1Manual = f.cap2Manual = false; syncCaptions(); };
 const usedBtn = el('used');
 const syncUsed = () => usedBtn.setAttribute('aria-pressed', f.used ? 'true' : 'false');
-usedBtn.onclick = () => { f.used = !f.used; syncUsed(); renderHooks(); changed(); };
+usedBtn.onclick = () => {
+  f.used = !f.used;
+  /* first-person hooks only with 我用过: turning it off puts back a headline from the product data */
+  if (!f.used && isPersonal(f.l1, cfg)) { [f.l1, f.l2] = suggest(d.p, false, cfg)[0]; el('l1').value = f.l1; el('l2').value = f.l2; }
+  syncUsed(); renderHooks(); changed();
+};
 
 el('phs').onclick = e => {
   const rm = e.target.closest('[data-rm]');
@@ -181,12 +186,16 @@ async function save(render) {
   if (render) { savedKey = r.posterKey; if (r.posterError) throw new Error(r.posterError); }
   return r;
 }
-el('regen').onclick = async () => {
+async function regenerate() {
   busy = true; syncDirty(); setPoster('busy');
   try { await save(true); setPoster('ok'); }
   catch (e) { setPoster('err', '海报没生成出来'); toast(e.message); }
   busy = false; syncDirty();
-};
+}
+el('regen').onclick = regenerate;
+/* the poster's 重试 (shared markup with the queue cards): re-render here instead of reloading the page,
+   which would throw away unsaved edits */
+document.addEventListener('rv:render', regenerate);
 el('approve').onclick = async () => {
   busy = true; syncDirty();
   if (posterKey(draft(), cfg) !== savedKey) setPoster('busy');
@@ -214,15 +223,19 @@ el('studio').onclick = async () => {
   } catch (e) { toast(e.message); }
 };
 
-/* poster still rendering when the page opened */
+/* poster still rendering when the page opened: wait, then show the poster the server actually made */
 async function waitPoster() {
   if (!$('.ed-pv .pvw[data-pending]')) return;
   busy = true; syncDirty();
+  let r = null;
   for (;;) {
-    await new Promise(r => setTimeout(r, 1500));
-    try { const s = await api('/status'); if (!s.rendering.includes(d.id)) break; } catch {}
+    await new Promise(res => setTimeout(res, 1500));
+    try { r = await api(`/drafts/${d.id}/poster`); if (!r.busy) break; } catch {}
   }
-  busy = false; setPoster('ok'); syncDirty();
+  busy = false;
+  if (r.posterError) setPoster('err', '海报没生成出来');
+  else { if (r.posterKey) savedKey = r.posterKey; setPoster('ok'); }
+  syncDirty();
 }
 
 syncUsed(); renderTps(); renderHooks(); renderPhotos(); syncCaptions(); syncDirty(); waitPoster();

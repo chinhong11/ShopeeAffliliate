@@ -54,16 +54,19 @@ function slotCard(s, entry, paused, postedName) {
   return href ? `<a class="slot ${cls}" role="button" href="${href}">${inner}</a>` : `<div class="slot ${cls}">${inner}</div>`;
 }
 
-export function queueView({ brand, pending, approved, today, paused, collecting, lastCollect, posterState, postedNames }) {
-  const sub = collecting || (lastCollect
-    ? `${zhDate(lastCollect.at)} · ${fmtTime(lastCollect.at)} 抓了 ${lastCollect.created} 个新品`
-    : `${zhDate(Date.now())} · 还没抓取`);
+export function queueView({ brand, pending, approved, today, paused, collecting, lastCollect, collectError, posterState, postedNames }) {
+  const failed = !collecting && collectError && (!lastCollect || collectError.at > lastCollect.at);
+  const sub = collecting || (failed
+    ? `${zhDate(collectError.at)} · ${fmtTime(collectError.at)} 抓取失败：${collectError.error}`
+    : lastCollect
+      ? `${zhDate(lastCollect.at)} · ${fmtTime(lastCollect.at)} 抓了 ${lastCollect.created} 个新品`
+      : `${zhDate(Date.now())} · 还没抓取`);
   const todayEntries = approved.filter(x => x.slot && x.slot.k === 0);
   const body = `
     <header class="rv-head">
       <div class="grow">
         <h1>待审核${pending.length ? `<span class="cnt">${pending.length}</span>` : ''}</h1>
-        <div class="hsub${collecting ? ' busy' : ''}" id="hsub">${esc(sub)}</div>
+        <div class="hsub${collecting ? ' busy' : failed ? ' err' : ''}" id="hsub">${esc(sub)}</div>
       </div>
       <button class="btn btn-ghost btn-sm" data-act="collect"${collecting ? ' disabled' : ''}>↻ 抓取</button>
     </header>

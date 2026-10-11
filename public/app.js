@@ -80,7 +80,10 @@ const ACT = {
     toast('已跳过', async () => { await api(`/drafts/${id}/unskip`, {}); await refresh(); });
   },
   async unapprove(id) { await api(`/drafts/${id}/unapprove`, {}); await refresh(); toast('已撤回，回到待审核'); },
-  async render(id) { api(`/drafts/${id}/render`, {}).catch(e => toast(e.message)); setTimeout(refresh, 300); },
+  async render(id) {
+    if ($('#ed')) { document.dispatchEvent(new CustomEvent('rv:render', { detail: id })); return; } // edit screen re-renders itself
+    api(`/drafts/${id}/render`, {}).catch(e => toast(e.message)); setTimeout(refresh, 300);
+  },
   async collect() {
     const r = await api('/collect', {});
     collecting = true;

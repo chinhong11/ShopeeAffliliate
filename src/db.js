@@ -68,6 +68,10 @@ CREATE TABLE IF NOT EXISTS conversions (
 );
 `);
 
+/* migrations for databases created by earlier builds */
+const cols = new Set(db.prepare('PRAGMA table_info(drafts)').all().map(c => c.name));
+if (!cols.has('pending_since')) db.exec('ALTER TABLE drafts ADD COLUMN pending_since INTEGER'); // start of the current 3-day review window
+
 export const kv = {
   get(k, def = null) { const r = db.prepare('SELECT v FROM kv WHERE k=?').get(k); return r ? JSON.parse(r.v) : def; },
   set(k, v) { db.prepare('INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').run(k, JSON.stringify(v)); },
@@ -83,7 +87,7 @@ const parse = r => r && {
   posterKey: r.poster_key, posterError: r.poster_error,
   priceChanged: r.price_changed ? JSON.parse(r.price_changed) : null,
   isNew: !!r.is_new, collectedDay: r.collected_day,
-  createdAt: r.created_at, approvedAt: r.approved_at, updatedAt: r.updated_at
+  createdAt: r.created_at, approvedAt: r.approved_at, updatedAt: r.updated_at, pendingSince: r.pending_since || r.created_at
 };
 
 export const drafts = {
@@ -91,13 +95,14 @@ export const drafts = {
   list: (status) => db.prepare('SELECT * FROM drafts WHERE status=? ORDER BY ' + (status === 'approved' ? 'approved_at' : 'created_at DESC, rowid')).all(status).map(parse),
   insert(d) {
     const now = Date.now();
-    db.prepare(`INSERT INTO drafts(id,item_id,shop_id,strategy,status,product,form,short_link,sub_ids,is_new,collected_day,created_at,updated_at)
-      VALUES(@id,@itemId,@shopId,@strat,'draft',@p,@form,@shortLink,@subIds,1,@collectedDay,@now,@now)`)
+    db.prepare(`INSERT INTO drafts(id,item_id,shop_id,strategy,status,product,form,short_link,sub_ids,is_new,collected_day,created_at,updated_at,pending_since)
+      VALUES(@id,@itemId,@shopId,@strat,'draft',@p,@form,@shortLink,@subIds,1,@collectedDay,@now,@now,@now)`)
       .run({ ...d, p: JSON.stringify(d.p), form: JSON.stringify(d.form), subIds: JSON.stringify(d.subIds || []), now });
   },
-  update(id, fields) {
+  /* `from`: only update while the status is one of these (atomic check-and-set); returns true if a row changed */
+  update(id, fields, { from = null } = {}) {
     const map = { status: 'status', p: 'product', form: 'form', shortLink: 'short_link', subIds: 'sub_ids', posterKey: 'poster_key', posterError: 'poster_error',
-      priceChanged: 'price_changed', isNew: 'is_new', approvedAt: 'approved_at' };
+      priceChanged: 'price_changed', isNew: 'is_new', approvedAt: 'approved_at', pendingSince: 'pending_since' };
     const sets = [], vals = {};
     for (const [k, v] of Object.entries(fields)) {
       const col = map[k]; if (!col) throw new Error('unknown draft field ' + k);
@@ -105,7 +110,9 @@ export const drafts = {
       vals[k] = (k === 'p' || k === 'form' || k === 'subIds' || k === 'priceChanged') ? (v === null ? null : JSON.stringify(v)) : (typeof v === 'boolean' ? +v : v);
     }
     sets.push('updated_at=@_now'); vals._now = Date.now();
-    db.prepare(`UPDATE drafts SET ${sets.join(',')} WHERE id=@_id`).run({ ...vals, _id: id });
+    let where = 'id=@_id';
+    if (from) { from.forEach((st, i) => { vals['_s' + i] = st; }); where += ` AND status IN (${from.map((_, i) => '@_s' + i).join(',')})`; }
+    return db.prepare(`UPDATE drafts SET ${sets.join(',')} WHERE ${where}`).run({ ...vals, _id: id }).changes > 0;
   },
   /* item already pending / approved */
   queuedItem: itemId => !!db.prepare("SELECT 1 FROM drafts WHERE item_id=? AND status IN ('draft','approved','posting','failed')").get(String(itemId)),

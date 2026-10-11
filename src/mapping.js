@@ -21,15 +21,19 @@ export function fmtSoldNum(n) {
 }
 export const fmtSold = (n, lang = 'zh') => lang === 'mix' ? fmtSoldNum(n) + ' sold' : '已售 ' + fmtSoldNum(n);
 
-/* strip 【…】, emoji, "Ready Stock" / "COD" noise; ≤ 24 chars */
+/* strip 【…】, emoji, "Ready Stock" / "COD" noise; ≤ 24 characters */
 export function shortName(s) {
   s = String(s || '')
     .replace(/【[^】]*】/g, '').replace(/\[[^\]]*\]/g, '')
-    .replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{20E3}]/gu, '')
-    .replace(/\b(Ready\s*Stock|COD|Readystock)\b/gi, '')
+    /* emoji incl. flags (regional indicators), skin tones, tag sequences, ZWJ, variation selectors, keycaps */
+    .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u{E0020}-\u{E007F}\u{FE0F}\u{200D}\u{20E3}]/gu, '')
+    .replace(/\bReady\s*Stock\b/gi, '')
+    .replace(/\bCOD\b/g, '') // cash on delivery, written in capitals; keeps e.g. "Cod Liver Oil"
+    .replace(/\(\s*\)|（\s*）/g, '')
     .replace(/[|｜]+/g, ' ')
     .replace(/\s+/g, ' ').replace(/^[\s\-–—,:;]+|[\s\-–—,:;]+$/g, '').trim();
-  return s.length > 24 ? s.slice(0, 23) + '…' : s;
+  const cps = Array.from(s); // cut whole code points, never half a surrogate pair
+  return cps.length > 24 ? cps.slice(0, 23).join('') + '…' : s;
 }
 
 export const hasDisc = p => num(p.disc) !== null && p.disc >= 10;
@@ -87,7 +91,7 @@ export function studioState(d, cfg, photoSrc = x => x) {
   if (!hasRating(p)) st.proof = false;
   if (f.tpl === 't5') st.review = { quote: f.review.quote, author: f.review.author || '— Shopee 买家' };
   if (f.tpl === 't3') {
-    st.cd = remainTo(f.flash.end, d.nowMinutes);
+    st.cd = countdown(f.flash, d.now);
     st.stockTxt = '限时闪购中';
     st.stockPct = Math.max(1, Math.min(99, +f.flash.pct || 1));
   }
@@ -96,14 +100,24 @@ export function studioState(d, cfg, photoSrc = x => x) {
   return st;
 }
 
-/* countdown to a real end time "HH:MM" (t3) */
-export function remainTo(end, nowMinutes) {
-  const [h, m] = String(end || '0:0').split(':').map(Number);
-  let now = nowMinutes;
-  if (now === undefined) { const t = new Date(); now = t.getHours() * 60 + t.getMinutes(); }
-  let r = h * 60 + m - now; if (r < 0) r += 1440;
-  return { h: String(Math.floor(r / 60)).padStart(2, '0'), m: String(r % 60).padStart(2, '0'), s: '00' };
+/* t3: the sale's end as a timestamp. "HH:MM" entered in the edit screen means the next time it is HH:MM
+   (later today, or tomorrow if that time has passed). 0 = invalid. */
+export function endAtFrom(hhmm, now = Date.now()) {
+  const m = /^(\d\d):(\d\d)$/.exec(hhmm || '');
+  if (!m || +m[1] > 23 || +m[2] > 59) return 0;
+  const d = new Date(now);
+  d.setHours(+m[1], +m[2], 0, 0);
+  if (d.getTime() <= now) d.setDate(d.getDate() + 1);
+  return d.getTime();
 }
+/* time left until flash.endAt (never wraps: an ended sale shows 00:00:00 and is never posted, see publish.js) */
+export function countdown(flash, now = Date.now()) {
+  const end = (flash && flash.endAt) || endAtFrom(flash && flash.end, now);
+  const r = Math.max(0, Math.floor((end - now) / 1000));
+  const p = n => String(n).padStart(2, '0');
+  return { h: p(Math.floor(r / 3600)), m: p(Math.floor(r / 60) % 60), s: p(r % 60) };
+}
+export const flashEnded = (flash, now = Date.now()) => !(flash && flash.endAt > now);
 
 /* studio demo values (post-studio-v3.js freshDef) that must never reach a saved poster unless the data says so */
 export const STUDIO_DEMO = {
@@ -131,6 +145,6 @@ export function placeholderProblems(live, patch) {
   return bad;
 }
 
-/* poster cache key: the studio state the poster is rendered from (countdown time excluded) */
+/* poster cache key: the studio state the poster is rendered from (countdown time excluded: fixed clock) */
 export function hash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + '_' + s.length; }
-export const posterKey = (d, cfg) => hash(JSON.stringify(studioState({ ...d, nowMinutes: 0 }, cfg)));
+export const posterKey = (d, cfg) => hash(JSON.stringify(studioState({ ...d, now: 0 }, cfg)));

@@ -5,37 +5,55 @@ import crypto from 'node:crypto';
 import { loadConfig, dirs } from './config.js';
 import { drafts, kv, ymd, db } from './db.js';
 import * as shopee from './shopee.js';
-import { posterKey, TPL } from './mapping.js';
-import { refreshCaptions, availability } from './pick.js';
+import { posterKey, TPL, endAtFrom } from './mapping.js';
+import { refreshCaptions, availability, isPersonal, suggest } from './pick.js';
 import { renderDraft, posterFile, thumbFile } from './render.js';
 import { upcoming } from './slots.js';
 import { collect } from './collect.js';
 
+export const EXPIRE_MS = 3 * 86400e3; // README: drafts not approved within 3 days expire
+const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
 /* live status for the review app (polled by /api/status) */
 export const status = { collecting: '', collectResult: null, rendering: new Set(), queued: new Set() };
-const listeners = [];
-export const onCollected = fn => listeners.push(fn);
+const listeners = { collected: [], collectFailed: [] };
+export const onCollected = fn => listeners.collected.push(fn);
+export const onCollectFailed = fn => listeners.collectFailed.push(fn);
+/* listeners may be async; a failing one is logged, never an unhandled rejection */
+const fire = (list, arg) => list.forEach(fn => Promise.resolve().then(() => fn(arg)).catch(e => console.error('listener', e.message)));
 
 /* ---------- posters ---------- */
-const inflight = new Map();
+const inflight = new Map(); // id → { key, promise } of the render running for that draft
 export const posterFresh = (d, cfg = loadConfig()) => !!d.posterKey && d.posterKey === posterKey(d, cfg) && fs.existsSync(posterFile(d.id)) && fs.existsSync(thumbFile(d.id));
 
+/* resolves once the draft's poster matches its current state (force: render again regardless) */
 export function ensurePoster(id, { force = false } = {}) {
-  if (inflight.has(id)) return inflight.get(id);
   const d = drafts.get(id);
   if (!d) return Promise.reject(new Error('no draft'));
-  if (!force && posterFresh(d)) return Promise.resolve(d);
+  const cfg = loadConfig();
+  const key = posterKey(d, cfg);
+  const cur = inflight.get(id);
+  if (cur) {
+    if (!force && cur.key === key) return cur.promise;
+    /* a render of an older state is running (or a forced one is wanted): render again once it is done */
+    return cur.promise.catch(() => {}).then(() => ensurePoster(id, { force }));
+  }
+  if (!force && posterFresh(d, cfg)) return Promise.resolve(d);
   status.rendering.add(id);
-  const p = renderDraft(id).finally(() => { status.rendering.delete(id); status.queued.delete(id); inflight.delete(id); });
-  inflight.set(id, p);
-  return p;
+  const entry = { key, promise: null };
+  entry.promise = renderDraft(id).finally(() => {
+    if (inflight.get(id) === entry) { inflight.delete(id); status.rendering.delete(id); }
+  });
+  inflight.set(id, entry);
+  return entry.promise;
 }
-/* background renders, one after another */
+/* background renders, one after another; an id waits in the queue at most once */
 let bg = Promise.resolve();
 export function queuePosters(ids) {
   for (const id of ids) {
+    if (status.queued.has(id)) continue;
     status.queued.add(id);
-    bg = bg.then(() => ensurePoster(id)).catch(e => console.error('render', id, e.message));
+    bg = bg.then(() => { status.queued.delete(id); return ensurePoster(id); }).catch(e => console.error('render', id, e.message));
   }
   return bg;
 }
@@ -55,9 +73,15 @@ export function runCollect() {
   collect({ log })
     .then(r => {
       status.collectResult = { ok: true, created: r.created, at: Date.now() };
-      queuePosters(r.ids).then(() => listeners.forEach(fn => fn(r)));
+      kv.del('lastCollectError');
+      queuePosters(r.ids).then(() => fire(listeners.collected, r));
     })
-    .catch(e => { status.collectResult = { ok: false, error: e.message, at: Date.now() }; console.error('collect failed:', e.message); })
+    .catch(e => {
+      status.collectResult = { ok: false, error: e.message, at: Date.now() };
+      kv.set('lastCollectError', { at: Date.now(), error: e.message }); // shown in the 待审核 header until the next good collect
+      console.error('collect failed:', e.message);
+      fire(listeners.collectFailed, e);
+    })
     .finally(() => { status.collecting = ''; });
   return true;
 }
@@ -65,9 +89,9 @@ export function runCollect() {
 /* ---------- forms ---------- */
 const str = (v, n) => String(v ?? '').slice(0, n);
 const REF = /^(img|up):[\w.-]+$/;
-export function cleanForm(old, f) {
+export function cleanForm(old, f, d = null, cfg = loadConfig()) {
   const n = { ...old };
-  if (f.tpl && TPL[f.tpl]) n.tpl = f.tpl;
+  if (f.tpl && own(TPL, f.tpl)) n.tpl = f.tpl;
   if ('l1' in f) n.l1 = str(f.l1, 60);
   if ('l2' in f) n.l2 = str(f.l2, 60);
   if (Array.isArray(f.photos)) {
@@ -76,25 +100,35 @@ export function cleanForm(old, f) {
   }
   if ('used' in f) n.used = !!f.used;
   if (f.review) n.review = { quote: str(f.review.quote, 80), author: str(f.review.author, 16) };
-  if (f.flash) n.flash = { end: /^\d\d:\d\d$/.test(f.flash.end || '') ? f.flash.end : '', pct: str(f.flash.pct, 2).replace(/\D/g, '') };
+  if (f.flash) {
+    const end = endAtFrom(f.flash.end) ? f.flash.end : '';
+    const o = old.flash || {};
+    /* the end time becomes a date when it is set; unchanged times keep their date */
+    const endAt = !end ? 0 : (end === o.end && o.endAt && f.flash.endAt !== 0) ? o.endAt : endAtFrom(end);
+    n.flash = { end, pct: str(f.flash.pct, 2).replace(/\D/g, ''), endAt };
+  }
   if (f.chat) n.chat = { m1: str(f.chat.m1, 40), m2: str(f.chat.m2, 40), m3: str(f.chat.m3, 40) };
   for (const k of ['cap1', 'cap2']) if (k in f) n[k] = str(f[k], 2000);
   for (const k of ['cap1Manual', 'cap2Manual']) if (k in f) n[k] = !!f[k];
-  if (!availability(n)[n.tpl]) n.tpl = n.autoTpl; // locked templates need their real data first
+  if (!own(TPL, n.tpl) || !availability(n)[n.tpl]) n.tpl = n.autoTpl; // locked templates need their real data first
+  /* first-person hooks only on drafts marked 我用过 */
+  if (!n.used && d && isPersonal(n.l1, cfg)) [n.l1, n.l2] = suggest(d.p, false, cfg)[0];
   return n;
 }
 
 export function saveForm(id, f) {
   const d = drafts.get(id);
   if (!d) throw new Error('草稿不存在');
-  d.form = cleanForm(d.form, f || {});
-  refreshCaptions(d, loadConfig());
-  drafts.update(id, { form: d.form });
+  if (!['draft', 'approved'].includes(d.status)) throw new Error('这张草稿正在发布或已经处理完，不能再改了');
+  const cfg = loadConfig();
+  d.form = cleanForm(d.form, f || {}, d, cfg);
+  refreshCaptions(d, cfg);
+  if (!drafts.update(id, { form: d.form }, { from: ['draft', 'approved'] })) throw new Error('这张草稿刚刚开始发布，改动没有保存');
   return drafts.get(id);
 }
 
 /* sub IDs carry the template: when it changed, get a fresh short link and swap it into the captions */
-async function syncShortLink(d) {
+export async function syncShortLink(d) {
   if (d.subIds[1] === d.form.tpl) return d;
   const subIds = shopee.cleanSubIds(['fb', d.form.tpl, d.strat, d.subIds[3] || ymd(), d.id]);
   const link = await shopee.shortLink(d.p.productLink || d.p.offerLink, subIds);
@@ -106,20 +140,25 @@ async function syncShortLink(d) {
   return drafts.get(d.id);
 }
 
-/* ---------- actions ---------- */
+/* ---------- actions (every status change is a check-and-set on the status it started from) ---------- */
 export async function approve(id, form) {
   let d = drafts.get(id);
   if (!d || !['draft', 'approved'].includes(d.status)) throw new Error('这张草稿不能批准了');
-  const again = d.status === 'approved';
+  const from = d.status, again = from === 'approved';
+  if (from === 'draft' && d.pendingSince < Date.now() - EXPIRE_MS) {
+    drafts.update(id, { status: 'expired' }, { from: ['draft'] });
+    throw new Error('这张草稿超过 3 天没批准，已经过期了');
+  }
   if (form) d = saveForm(id, form);
   d = await syncShortLink(d);
   await ensurePoster(id);
-  drafts.update(id, { status: 'approved', approvedAt: again ? d.approvedAt : Date.now(), priceChanged: null, isNew: false });
+  const ok = drafts.update(id, { status: 'approved', approvedAt: again ? d.approvedAt : Date.now(), priceChanged: null, isNew: false }, { from: [from] });
+  if (!ok) throw new Error('这张草稿刚刚变了（跳过、退回或正在发布），刷新后再看');
   return { again, slot: slotOf(id) };
 }
-export function skip(id) { const d = drafts.get(id); if (d && d.status === 'draft') drafts.update(id, { status: 'skipped' }); }
-export function unskip(id) { const d = drafts.get(id); if (d && d.status === 'skipped') drafts.update(id, { status: 'draft' }); }
-export function unapprove(id) { const d = drafts.get(id); if (d && d.status === 'approved') drafts.update(id, { status: 'draft', approvedAt: 0 }); }
+export function skip(id) { drafts.update(id, { status: 'skipped' }, { from: ['draft'] }); }
+export function unskip(id) { drafts.update(id, { status: 'draft' }, { from: ['skipped'] }); }
+export function unapprove(id) { drafts.update(id, { status: 'draft', approvedAt: 0, pendingSince: Date.now() }, { from: ['approved'] }); }
 
 /* approved drafts fill upcoming slots in approval order */
 export function approvedWithSlots(cfg = loadConfig()) {
@@ -131,6 +170,9 @@ export const slotOf = id => { const r = approvedWithSlots().find(x => x.d.id ===
 
 /* photo upload (data:image/jpeg URL, already resized in the browser) → ref */
 export function savePhoto(id, dataUrl) {
+  if (!/^d[0-9a-f]{8}$/.test(String(id))) throw new Error('草稿不存在');
+  const d = drafts.get(id);
+  if (!d || !['draft', 'approved'].includes(d.status)) throw new Error('草稿不存在');
   const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ''));
   if (!m) throw new Error('照片格式不对');
   const buf = Buffer.from(m[2], 'base64');
@@ -140,15 +182,15 @@ export function savePhoto(id, dataUrl) {
   return 'up:' + name;
 }
 
-/* posting pause (Facebook token / rate-limit problems) */
+/* posting pause (Facebook token / rate-limit problems). source 'token' pauses are lifted by a passing token check. */
 const pauseListeners = [];
 export const onPause = fn => pauseListeners.push(fn);
 export const pause = {
   get: () => kv.get('publishPaused'),
-  set(code, message) {
-    const old = kv.get('publishPaused'), p = { code, message, at: Date.now() };
+  set(code, message, source = code === 190 ? 'token' : 'post') {
+    const old = kv.get('publishPaused'), p = { code, message, source, at: Date.now() };
     kv.set('publishPaused', p);
-    if (!old || old.message !== message) pauseListeners.forEach(fn => { try { fn(p); } catch (e) { console.error(e.message); } });
+    if (!old || old.message !== message) fire(pauseListeners, p);
   },
   clear: () => kv.del('publishPaused')
 };

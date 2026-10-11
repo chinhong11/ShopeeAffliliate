@@ -21,7 +21,11 @@ import { logView } from './views/log.js';
 import { statsView } from './views/stats.js';
 
 export const app = express();
-app.set('trust proxy', Number(process.env.TRUST_PROXY ?? 1));
+/* req.ip (login limit) may only come from X-Forwarded-For when a proxy we trust sets it: on by default on
+   Railway / Render / Fly (one proxy hop), off on a bare port (docker-compose on a VPS), override with TRUST_PROXY */
+const onProxyHost = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RENDER || process.env.FLY_APP_NAME);
+const tp = (process.env.TRUST_PROXY || '').trim();
+app.set('trust proxy', tp === '' ? (onProxyHost ? 1 : false) : /^\d+$/.test(tp) ? Number(tp) : tp === 'true' ? true : tp === 'false' ? false : tp);
 app.disable('x-powered-by');
 app.use((req, res, next) => {
   res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'SAMEORIGIN' });
@@ -80,7 +84,12 @@ app.get('/img/:f', (req, res) => {
 });
 
 /* ---------- pages ---------- */
-const posterState = d => ({ hasPoster: fs.existsSync(thumbFile(d.id)), busy: svc.status.rendering.has(d.id) || svc.status.queued.has(d.id) || (!fs.existsSync(thumbFile(d.id)) && !d.posterError) });
+/* a poster that doesn't match its draft (made by `npm run collect`, edited, …) is queued when it is shown,
+   so a spinner always means a render is really on its way */
+const posterState = (d, cfg) => {
+  if (!d.posterError && !svc.posterFresh(d, cfg)) svc.queuePosters([d.id]);
+  return { hasPoster: fs.existsSync(thumbFile(d.id)), busy: svc.status.rendering.has(d.id) || svc.status.queued.has(d.id) };
+};
 const pendingCount = () => db.prepare("SELECT COUNT(*) n FROM drafts WHERE status='draft'").get().n;
 
 app.get('/', (req, res) => {
@@ -91,7 +100,7 @@ app.get('/', (req, res) => {
   res.send(queueView({
     brand: brand(), pending: drafts.list('draft'), approved: svc.approvedWithSlots(cfg), today: todayView(cfg),
     paused: svc.pause.get(), collecting: svc.status.collecting, lastCollect: lc && lc.at > Date.now() - 36 * 3600e3 ? lc : null,
-    posterState, postedNames: posted
+    collectError: kv.get('lastCollectError'), posterState: d => posterState(d, cfg), postedNames: posted
   }));
 });
 
@@ -99,7 +108,7 @@ app.get('/d/:id', (req, res) => {
   const d = drafts.get(req.params.id);
   if (!d || !['draft', 'approved'].includes(d.status)) return res.redirect('/');
   const cfg = loadConfig();
-  const st = posterState(d);
+  const st = posterState(d, cfg);
   res.send(editView({ brand: brand(), d, st, cfg, count: pendingCount(), dirty: st.hasPoster && !st.busy && d.posterKey !== posterKey(d, cfg) }));
 });
 
@@ -160,6 +169,12 @@ api.post('/drafts/:id/save', wrap(async req => {
   return { form: n.form, posterKey: n.posterKey, posterError: n.posterError };
 }));
 api.post('/drafts/:id/render', wrap(async req => { await svc.ensurePoster(req.params.id, { force: true }); return { posterKey: drafts.get(req.params.id).posterKey }; }));
+/* the edit screen asks this after waiting for a background render */
+api.get('/drafts/:id/poster', wrap(req => {
+  const d = drafts.get(req.params.id);
+  if (!d) throw new Error('草稿不存在');
+  return { posterKey: d.posterKey, posterError: d.posterError, busy: svc.status.rendering.has(d.id) || svc.status.queued.has(d.id) };
+}));
 api.post('/drafts/:id/photo', wrap(req => { const ref = svc.savePhoto(req.params.id, req.body.dataUrl); return { ref, url: '/img/' + ref.slice(3) }; }));
 api.get('/drafts/:id/studio-state', wrap(req => {
   const d = drafts.get(req.params.id);
@@ -170,7 +185,8 @@ api.get('/drafts/:id/studio-state', wrap(req => {
 api.post('/token', wrap(async () => {
   const r = await fb.checkToken();
   if (r.ok) { svc.pause.clear(); return { ok: true }; }
-  svc.pause.set(r.error ? r.error.code : 190, 'Facebook token 有问题：' + r.problems.join('；') + '。到 Meta 重新生成 Page token，更新到服务器设置后点「重试」。批准的帖子会继续排队。');
+  if (r.transient) return { ok: false, error: '暂时连不上 Facebook（' + r.problems.join('；') + '），过几分钟再点重试' };
+  svc.pause.set(190, 'Facebook token 有问题：' + r.problems.join('；') + '。到 Meta 重新生成 Page token，更新到服务器设置后点「重试」。批准的帖子会继续排队。', 'token');
   return { ok: false, error: r.problems.join('；') };
 }));
 api.post('/posts/:id/retry', wrap(req => publish.retryPost(Number(req.params.id))));
@@ -180,13 +196,12 @@ app.use((req, res) => res.status(404).send('Not found'));
 
 /* ---------- start ---------- */
 export async function start() {
-  publish.recoverInterrupted();
   /* posters missing after a restart / collect from the CLI */
   const cfg = loadConfig();
   const stale = [...drafts.list('draft'), ...drafts.list('approved')].filter(d => !svc.posterFresh(d, cfg) && !d.posterError).map(d => d.id);
   if (stale.length) svc.queuePosters(stale);
   const srv = app.listen(env.PORT, () => console.log(`review app on http://localhost:${env.PORT}${env.SHOPEE_MOCK ? ' (SHOPEE_MOCK)' : ''}`));
-  if (telegram.init({ onCollected: svc.onCollected, onPublishEvent: publish.onPublishEvent, onPause: svc.onPause })) console.log('telegram on');
+  if (telegram.init({ onCollected: svc.onCollected, onCollectFailed: svc.onCollectFailed, onPublishEvent: publish.onPublishEvent, onPause: svc.onPause })) console.log('telegram on');
   if (process.env.DISABLE_JOBS !== '1') startJobs();
   const stop = async () => { console.log('shutting down'); stopJobs(); srv.close(); await closeBrowser(); process.exit(0); };
   process.on('SIGTERM', stop); process.on('SIGINT', stop);

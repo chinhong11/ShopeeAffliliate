@@ -91,14 +91,58 @@ export function cap2(d, cfg = {}) {
 }
 
 /* which templates the form unlocks (edit screen) */
-export function availability(f) {
+export function availability(f, now = Date.now()) {
   return {
     t1: true, t2: true, t6: true,
     t5: !!(f.review && f.review.quote.trim()),
-    t3: !!(f.flash && f.flash.end && f.flash.pct),
+    /* a real end time + progress; once saved, the end must still be ahead (endAt is set by the server) */
+    t3: !!(f.flash && f.flash.end && f.flash.pct) && !(f.flash.endAt && f.flash.endAt <= now),
     t4: !!(f.chat && f.chat.m1.trim() && f.chat.m2.trim() && f.chat.m3.trim()),
     t8: (f.photos || []).length === 4
   };
+}
+
+/* is this one of the first-person hooks (only allowed with 我用过)? */
+export const isPersonal = (l1, cfg) => PERSONAL[langOf(cfg)].some(([a]) => a === l1);
+
+/* replace the old numbers in free text (hand-edited headline / captions) with the new ones */
+export function swapNumbers(text, o, n, cfg) {
+  if (!text) return text;
+  const lang = langOf(cfg);
+  const pairs = [[rm(o.price), rm(n.price)], [wasOf(o), wasOf(n)], [pctOf(o), pctOf(n)], [fmtSold(o.sales, lang), fmtSold(n.sales, lang)]];
+  const ro = rateOf(o), rn = rateOf(n);
+  if (ro && rn) pairs.push(['★' + ro, '★' + rn], [ro + '★', rn + '★'], ['评分 ' + ro, '评分 ' + rn], [ro + ' 分', rn + ' 分']);
+  for (const [a, b] of pairs) if (a && b && a !== b) text = text.split(a).join(b);
+  return text;
+}
+
+/* product data changed (pre-post price check): a headline built from the data is rebuilt from the new data
+   (the new data's own condition if that changed); a hand-written one gets its numbers swapped */
+export function refreshHeadline(f, o, n, cfg) {
+  const lang = langOf(cfg);
+  if (isPersonal(f.l1, cfg)) return { l1: f.l1, l2: f.l2 };
+  for (const [k, list] of Object.entries(HL[lang])) {
+    for (const v of list) {
+      if (fill(v[0], o, lang) !== f.l1 || fill(v[1], o, lang) !== f.l2) continue;
+      const nk = hlKind(n), use = nk === k ? v : HL[lang][nk][0];
+      return { l1: fill(use[0], n, lang), l2: fill(use[1], n, lang) };
+    }
+  }
+  return { l1: swapNumbers(f.l1, o, n, cfg), l2: swapNumbers(f.l2, o, n, cfg) };
+}
+
+/* what goes to Facebook: caption ① and comment ②, always carrying the affiliate link
+   (in the caption in direct mode, in the first comment otherwise), whatever mode the captions were written in */
+export function postTexts(d, cfg = {}) {
+  const direct = cfg.linkMode === 'direct', link = d.shortLink || '';
+  let message = d.form.cap1 || cap1(d, cfg);
+  let comment = direct ? null : (d.form.cap2 || cap2(d, cfg));
+  if (link && direct && !message.includes(link)) {
+    const said = ['👉 购买链接放在第一条评论，自取！👇👇', '👉 购买链接放在第一条评论 👇'].find(t => message.includes(t));
+    message = said ? message.split(said).join('👉 直接点这里买：' + link) : `${message}\n\n👉 直接点这里买：${link}`;
+  }
+  if (link && !direct && !comment.includes(link)) comment = `${comment}\n${link}`;
+  return { message, comment };
 }
 
 /* recompute auto-written captions unless edited by hand */

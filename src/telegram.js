@@ -61,7 +61,13 @@ router.post('/telegram/:secret', express.json({ limit: '1mb' }), async (req, res
   const [act, id] = String(q.data || '').split(':');
   let text;
   try {
-    if (act === 'ap') { const r = await svc.approve(id); text = r.again ? '已经批准过了' : '✅ 已批准 · ' + (r.slot ? r.slot.text + ' 发布' : '等空位'); }
+    if (act === 'ap') {
+      const d0 = drafts.get(id);
+      /* this message shows the old price: a 价格变了 draft is approved in the review app, after seeing the new poster */
+      if (d0 && d0.priceChanged) throw new Error(`价格变了（${d0.priceChanged.from} → ${d0.priceChanged.to}），请在后台看过新海报再批准`);
+      const r = await svc.approve(id);
+      text = r.again ? '已经批准过了' : '✅ 已批准 · ' + (r.slot ? r.slot.text + ' 发布' : '等空位');
+    }
     else if (act === 'sk') { const d = drafts.get(id); if (!d || d.status !== 'draft') throw new Error('这张草稿已经处理过了'); svc.skip(id); text = '❌ 已跳过'; }
     else return;
   } catch (e) { text = '⚠️ ' + e.message; }
@@ -85,9 +91,10 @@ export async function setWebhook() {
 }
 
 /* reports: collect → posters, post success / failure / returned, token problems */
-export function init({ onCollected, onPublishEvent, onPause }) {
+export function init({ onCollected, onCollectFailed, onPublishEvent, onPause }) {
   if (!enabled()) return false;
   onCollected(r => sendDrafts(r.drafts).then(() => r.created ? null : send('今天没有抓到新品（都发过了或不达标）')));
+  if (onCollectFailed) onCollectFailed(e => send(`⚠️ 抓取失败：${e.message}${env.PUBLIC_URL ? '\n' + env.PUBLIC_URL : ''}`));
   onPublishEvent((type, { d, permalink, message, note }) => {
     const n = shortName(d.p.name);
     if (type === 'posted') send(`✅ 已发布：${n}\n${permalink || ''}${note ? '\n⚠️ ' + note : ''}`);

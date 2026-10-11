@@ -14,12 +14,14 @@ export class FbError extends Error {
   }
   get fatal() { return FATAL.has(this.code); }
   get serverError() { return this.status >= 500; }
+  get network() { return this.status === 599; } // no answer at all: a POST may or may not have been carried out
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 export const opts = { retryDelayMs: 60000, fetchImpl: (...a) => fetch(...a) };
 
-/* one Graph call; 5xx retried once after 60 s */
+/* one Graph call; 5xx retried once after 60 s. A POST that got no answer (network error) is not re-sent:
+   Facebook may already have created the post, and a second send would publish it twice. */
 export async function graph(method, path, params = {}, { file } = {}) {
   const url = new URL(GRAPH() + path);
   const send = async () => {
@@ -44,7 +46,7 @@ export async function graph(method, path, params = {}, { file } = {}) {
   };
   try { return await send(); }
   catch (e) {
-    if (!(e instanceof FbError) || !e.serverError) throw e;
+    if (!(e instanceof FbError) || !e.serverError || (e.network && method !== 'GET')) throw e;
     await sleep(opts.retryDelayMs);
     return send();
   }
@@ -82,7 +84,11 @@ export async function checkToken() {
   if (!env.FB_APP_ID || !env.FB_APP_SECRET) return { ok: false, problems: ['FB_APP_ID / FB_APP_SECRET 没设置'] };
   let d;
   try { d = (await graph('GET', '/debug_token', { input_token: env.FB_PAGE_TOKEN, access_token: `${env.FB_APP_ID}|${env.FB_APP_SECRET}` })).data || {}; }
-  catch (e) { return { ok: false, problems: [e.message], error: e }; }
+  catch (e) {
+    /* couldn't ask (network, Facebook 5xx, temporary / rate-limit codes): says nothing about the token */
+    const transient = e instanceof FbError && (e.network || e.serverError || [1, 2, 4, 17, 32, 341].includes(e.code));
+    return { ok: false, transient, problems: [e.message], error: e };
+  }
   const p = [];
   if (!d.is_valid) p.push('token 无效' + (d.error ? '：' + d.error.message : ''));
   if (d.type !== 'PAGE') p.push(`type 是 ${d.type || '?'}，要 PAGE`);
