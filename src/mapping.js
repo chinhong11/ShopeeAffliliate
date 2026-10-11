@@ -64,9 +64,15 @@ export function productFromOffer(n) {
 /* draft → window.PostStudio.load() patch.
    Every field the studio defaults to a demo value is set explicitly here (empty when there is no data),
    so no placeholder survives; see placeholderProblems(). `photoSrc` maps stored photo refs → URLs. */
+export const T8_CAPS = ['', '为什么值得买 ✅', '细节实拍 🔍', '怎么下单 👇'];
+/* 在 Studio 精修 (form.look): the person's own styling, drawn over the app's; product data and photos stay the app's */
+const LOOK_STYLE = ['c1', 'c2', 'ol', 'hl', 'hlc', 'font', 'size', 'align', 'scrim', 'bg', 'ctaText', 'arrow', 'shopee'];
+
 export function studioState(d, cfg, photoSrc = x => x) {
   const p = d.p, f = d.form, lang = cfg.language === 'mix' ? 'mix' : 'zh';
   const photos = (f.photos || []).slice(0, 4);
+  const lk = f.look || {};
+  const framed = (map, ref) => { const src = photoSrc(ref), q = map && map[ref]; return q ? { src, zoom: q.zoom, x: q.x, y: q.y } : src; };
   const n = Math.max(1, Math.min(4, photos.length));
   const code = (cfg.voucherCode || '').trim();
   const mode = cfg.linkMode === 'direct' ? 'direct' : 'comment';
@@ -74,7 +80,7 @@ export function studioState(d, cfg, photoSrc = x => x) {
   const st = {
     tpl: f.tpl, layout: n, lang,
     l1: f.l1 || '', l2: f.l2 || '',
-    photos: photos.map(photoSrc),
+    photos: photos.map(ref => framed(lk.frames, ref)),
     price: hasDisc(p) || f.tpl === 't2', now: rm(p.price), was: wasOf(p), pct: pctOf(p),
     seal: hasDisc(p) && p.disc >= 20, sealLabel: 'OFF',
     proof: hasRating(p) && p.rating >= 4.5, rate: rateOf(p), sold: fmtSold(p.sales, lang),
@@ -96,7 +102,12 @@ export function studioState(d, cfg, photoSrc = x => x) {
     st.stockPct = Math.max(1, Math.min(99, +f.flash.pct || 1));
   }
   if (f.tpl === 't4') st.chat = { title: '好物分享群 🔥', sub: '群聊', m1: f.chat.m1, m2: f.chat.m2, m3: f.chat.m3 };
-  if (f.tpl === 't8') st.set = { pages: photos.map(photoSrc).map((src, i) => ({ src, cap: ['', '为什么值得买 ✅', '细节实拍 🔍', '怎么下单 👇'][i] })) };
+  if (f.tpl === 't8') st.set = { pages: photos.map((ref, i) => {
+    const ph = framed(lk.pageFrames, ref);
+    return { ...(typeof ph === 'string' ? { src: ph } : ph), cap: lk.pageCaps && typeof lk.pageCaps[i] === 'string' ? lk.pageCaps[i] : T8_CAPS[i] };
+  }) };
+  for (const k of LOOK_STYLE) if (lk[k] !== undefined) st[k] = lk[k];
+  for (const k of ['seal', 'proof', 'cta']) if (lk[k] === false) st[k] = false; // hidden in the studio; never shown where the data turned it off
   return st;
 }
 

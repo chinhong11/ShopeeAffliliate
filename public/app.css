@@ -56,3 +56,7 @@ body{background:var(--bg);-webkit-tap-highlight-color:transparent}
 /* slot card: on a narrow phone the planned minute moves under the time as a whole, never split mid-text */
 .rv .slot .st{flex-wrap:wrap;row-gap:3px}
 .rv .slot .st span{white-space:nowrap}
+/* the draft carries styling from 在 Studio 精修 */
+.look-note{margin-top:12px;display:flex;align-items:center;gap:10px;padding:8px 8px 8px 12px;border-radius:10px;background:rgba(61,220,132,.08);border:1px solid rgba(61,220,132,.3);font-size:12.5px;font-weight:700;color:var(--okt)}
+.look-note span{flex:1}
+.look-note[hidden]{display:none}

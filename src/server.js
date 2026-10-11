@@ -69,6 +69,13 @@ app.use((req, res, next) => {
   res.status(401).end();
 });
 
+/* 在 Studio 精修 (…v3.html?draft=<id>): the studio page also gets the bar that loads that draft and saves
+   what you change back to it (public/studio-bridge.js); the studio files themselves stay as they are */
+app.get('/studio/:file', (req, res, next) => {
+  if (req.params.file !== 'Shopee Post Maker v3.html' || !/^d[0-9a-f]{8}$/.test(String(req.query.draft || ''))) return next();
+  const html = fs.readFileSync(path.join(ROOT, 'studio', 'Shopee Post Maker v3.html'), 'utf8');
+  res.type('html').set('Cache-Control', 'no-store').send(html.replace('</body>', '<script type="module" src="/static/studio-bridge.js"></script>\n</body>'));
+});
 app.use('/studio', express.static(path.join(ROOT, 'studio')));
 app.get('/shared/:f', (req, res) => ['mapping.js', 'pick.js'].includes(req.params.f) ? sendFile(res, path.join(ROOT, 'src', req.params.f), 'text/javascript') : res.status(404).end());
 app.get('/posters/:f', (req, res) => {
@@ -178,7 +185,14 @@ api.post('/drafts/:id/render', wrap(async req => { await svc.ensurePoster(req.pa
 api.get('/drafts/:id/poster', wrap(req => {
   const d = drafts.get(req.params.id);
   if (!d) throw new Error('草稿不存在');
-  return { posterKey: d.posterKey, posterError: d.posterError, busy: svc.status.rendering.has(d.id) || svc.status.queued.has(d.id) };
+  return { posterKey: d.posterKey, posterError: d.posterError, busy: svc.status.rendering.has(d.id) || svc.status.queued.has(d.id), lookAt: (d.form.look && d.form.look.at) || 0 };
+}));
+/* 保存到草稿 in the studio: keep what was changed there, then make the poster from it */
+api.post('/drafts/:id/studio', wrap(async req => {
+  const d = svc.saveStudio(req.params.id, req.body && req.body.changes);
+  await svc.ensurePoster(d.id);
+  const n = drafts.get(d.id), st = studioState(n, loadConfig());
+  return { posterKey: n.posterKey, posterError: n.posterError, lookAt: (n.form.look && n.form.look.at) || 0, shown: { seal: st.seal, proof: st.proof, tpl: n.form.tpl } };
 }));
 api.post('/drafts/:id/photo', wrap(req => { const ref = svc.savePhoto(req.params.id, req.body.dataUrl); return { ref, url: '/img/' + ref.slice(3) }; }));
 api.get('/drafts/:id/studio-state', wrap(req => {

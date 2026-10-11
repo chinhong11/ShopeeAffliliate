@@ -193,6 +193,7 @@ const unsaved = () => JSON.stringify(f) !== savedForm;
 let saving = null, retryAt = 0, lastErr = '', leaveAnyway = false;
 const savedNote = () => { const n = el('sv'); if (!n) return; n.textContent = '· 已保存'; clearTimeout(savedNote.t); savedNote.t = setTimeout(() => { n.textContent = ''; }, 2500); };
 function autosave() {
+  if (reloading) return Promise.resolve();
   if (saving) return saving;
   if (busy || !unsaved() || Date.now() < retryAt) return Promise.resolve();
   saving = save(false).then(() => { lastErr = ''; savedNote(); }, err => {
@@ -213,7 +214,7 @@ async function leave(href) {
 }
 /* phone back gesture, closing the tab, switching apps: send what's left (keepalive survives the page) */
 const flush = () => {
-  if (!unsaved()) return;
+  if (reloading || !unsaved()) return;
   fetch(`/api/drafts/${d.id}/save`, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'rv' }, body: JSON.stringify({ form: f, render: false, queue: true }) }).catch(() => {});
 };
 addEventListener('pagehide', flush);
@@ -245,18 +246,26 @@ el('approve').onclick = async () => {
     location.href = '/';
   } catch (e) { busy = false; syncDirty(); setPoster('none'); toast(e.message); }
 };
-/* desktop: open the studio with this draft loaded (and saved in the studio's own storage) */
+/* desktop: open the studio on this draft; its 保存到草稿 sends the changes back (public/studio-bridge.js) */
 el('studio').onclick = async () => {
-  const w = window.open('/studio/Shopee%20Post%20Maker%20v3.html', '_blank');
-  try {
-    if (saving) await saving;
-    if (unsaved()) await save(false);
-    const st = await api(`/drafts/${d.id}/studio-state`);
-    for (let i = 0; i < 200 && !(w && w.PostStudio); i++) await new Promise(r => setTimeout(r, 150));
-    if (!w || !w.PostStudio) throw new Error('Studio 没打开（被浏览器拦截了？）');
-    await w.PostStudio.load(st, { persist: true });
-  } catch (e) { toast(e.message); }
+  const w = window.open('about:blank', '_blank'); // opened right away so the browser doesn't block it
+  try { if (saving) await saving; if (unsaved()) await save(false); } catch (e) { toast(e.message); }
+  if (w) w.location.href = `/studio/Shopee%20Post%20Maker%20v3.html?draft=${encodeURIComponent(d.id)}`;
+  else toast('Studio 没打开（被浏览器拦截了？）');
 };
+/* the studio saved this draft: show what it made. This page has nothing unsaved by then (it saved when you
+   switched tabs); anything typed in the last moment is dropped rather than written over the studio's changes. */
+let reloading = false;
+const reloadFromServer = () => { reloading = true; location.reload(); };
+try { new BroadcastChannel('rv').onmessage = e => { if (e.data && e.data.type === 'studio-saved' && e.data.id === d.id) reloadFromServer(); }; } catch {}
+/* no BroadcastChannel (older Safari): coming back to this tab, a newer studio save reloads it.
+   Only newer: 清除 here leaves the server's older one until it's saved, and that's not a studio change */
+const lookAt0 = (f.look && f.look.at) || 0;
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible' || reloading) return;
+  try { const r = await api(`/drafts/${d.id}/poster`); if ((r.lookAt || 0) > lookAt0) reloadFromServer(); } catch {}
+});
+el('lookClear').onclick = () => { f.look = null; el('lookNote').hidden = true; changed(); };
 
 /* poster still rendering when the page opened: wait, then show the poster the server actually made */
 async function waitPoster() {

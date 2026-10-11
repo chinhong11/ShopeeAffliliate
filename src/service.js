@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { loadConfig, dirs } from './config.js';
 import { drafts, kv, ymd, db } from './db.js';
 import * as shopee from './shopee.js';
-import { posterKey, TPL, endAtFrom } from './mapping.js';
+import { posterKey, TPL, endAtFrom, T8_CAPS } from './mapping.js';
 import { refreshCaptions, availability, isPersonal, suggest } from './pick.js';
 import { renderDraft, posterFile, thumbFile } from './render.js';
 import { upcoming } from './slots.js';
@@ -88,6 +88,42 @@ export function runCollect() {
 
 /* ---------- forms ---------- */
 const str = (v, n) => String(v ?? '').slice(0, n);
+
+/* 在 Studio 精修: styles and photo framing set in the studio, kept per draft (form.look) and drawn over the app's
+   own studio state (mapping.studioState). Only these fields, only valid values; prices, rating, sold, photos and
+   the brand badge stay the app's. */
+const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+export const STUDIO_FONTS = ['"Noto Sans SC","Nunito"', '"Baloo 2","Noto Sans SC"', '"Ma Shan Zheng","Noto Sans SC"', '"Montserrat","Noto Sans SC"', '"Anton","Noto Sans SC"'];
+const int = (v, lo, hi) => v === '' || v == null || typeof v === 'boolean' || !Number.isFinite(+v) ? undefined : Math.min(hi, Math.max(lo, Math.round(+v)));
+export function cleanLook(lk, photos = []) {
+  if (!lk || typeof lk !== 'object') return undefined;
+  const o = {};
+  for (const k of ['c1', 'c2', 'ol', 'hlc', 'bg']) if (typeof lk[k] === 'string' && HEX.test(lk[k])) o[k] = lk[k];
+  for (const k of ['hl', 'arrow', 'shopee']) if (typeof lk[k] === 'boolean') o[k] = lk[k];
+  for (const k of ['seal', 'proof', 'cta']) if (lk[k] === false) o[k] = false; // can be hidden, never brought back
+  if (STUDIO_FONTS.includes(lk.font)) o.font = lk.font;
+  const size = int(lk.size, 70, 140), scrim = int(lk.scrim, 0, 80);
+  if (size !== undefined) o.size = size;
+  if (scrim !== undefined) o.scrim = scrim;
+  if (['left', 'center', 'right'].includes(lk.align)) o.align = lk.align;
+  if (typeof lk.ctaText === 'string' && lk.ctaText.trim()) o.ctaText = lk.ctaText.trim().slice(0, 24);
+  const frames = m => {
+    const out = {};
+    for (const [ref, q] of Object.entries(m && typeof m === 'object' ? m : {})) {
+      if (!photos.includes(ref) || !q || typeof q !== 'object') continue; // a photo that's gone takes its framing with it
+      const zoom = int(q.zoom, 100, 280), x = int(q.x, 0, 100), y = int(q.y, 0, 100);
+      if (zoom !== undefined && x !== undefined && y !== undefined) out[ref] = { zoom, x, y };
+    }
+    return Object.keys(out).length ? out : undefined;
+  };
+  const fr = frames(lk.frames), pf = frames(lk.pageFrames);
+  if (fr) o.frames = fr;
+  if (pf) o.pageFrames = pf;
+  if (Array.isArray(lk.pageCaps)) o.pageCaps = lk.pageCaps.slice(0, 4).map(c => str(c, 30));
+  if (!Object.keys(o).length) return undefined;
+  if (Number.isFinite(+lk.at) && +lk.at > 0) o.at = +lk.at;
+  return o;
+}
 const REF = /^(img|up):[\w.-]+$/;
 export function cleanForm(old, f, d = null, cfg = loadConfig()) {
   const n = { ...old };
@@ -108,6 +144,10 @@ export function cleanForm(old, f, d = null, cfg = loadConfig()) {
     n.flash = { end, pct: str(f.flash.pct, 2).replace(/\D/g, ''), endAt };
   }
   if (f.chat) n.chat = { m1: str(f.chat.m1, 40), m2: str(f.chat.m2, 40), m3: str(f.chat.m3, 40) };
+  /* the studio's look comes with the form, unless the page still had an older one than the studio saved since */
+  const stale = 'look' in f && f.look && n.look && (+f.look.at || 0) < (+n.look.at || 0);
+  const look = cleanLook('look' in f && !stale ? f.look : n.look, n.photos);
+  if (look) n.look = look; else delete n.look;
   for (const k of ['cap1', 'cap2']) if (k in f) n[k] = str(f[k], 2000);
   for (const k of ['cap1Manual', 'cap2Manual']) if (k in f) n[k] = !!f[k];
   if (!own(TPL, n.tpl) || !availability(n)[n.tpl]) n.tpl = n.autoTpl; // locked templates need their real data first
@@ -125,6 +165,36 @@ export function saveForm(id, f) {
   refreshCaptions(d, cfg);
   if (!drafts.update(id, { form: d.form }, { from: ['draft', 'approved'] })) throw new Error('这张草稿刚刚开始发布，改动没有保存');
   return drafts.get(id);
+}
+
+/* 在 Studio 精修 → 保存到草稿: the bridge sends only what was changed in the studio (styles, texts, photo
+   framing by photo position, carousel captions); everything else in the draft stays as it is */
+const LOOK_KEYS = ['c1', 'c2', 'ol', 'hl', 'hlc', 'font', 'size', 'align', 'scrim', 'bg', 'ctaText', 'cta', 'arrow', 'shopee', 'seal', 'proof'];
+export function saveStudio(id, ch) {
+  const d = drafts.get(id);
+  if (!d) throw new Error('草稿不存在');
+  ch = ch && typeof ch === 'object' ? ch : {};
+  const fm = d.form, f = {}, look = { ...(fm.look || {}) };
+  for (const k of ['tpl', 'l1', 'l2']) if (own(ch, k) && typeof ch[k] === 'string') f[k] = ch[k];
+  if (ch.review && typeof ch.review === 'object') f.review = { ...fm.review, ...ch.review };
+  if (ch.chat && typeof ch.chat === 'object') f.chat = { ...fm.chat, ...ch.chat };
+  for (const k of LOOK_KEYS) if (own(ch, k)) look[k] = ch[k];
+  if (Array.isArray(ch.frames)) {
+    look.frames = { ...(look.frames || {}) };
+    ch.frames.forEach((q, i) => { if (q && fm.photos[i]) look.frames[fm.photos[i]] = q; });
+  }
+  if (Array.isArray(ch.pages)) {
+    look.pageFrames = { ...(look.pageFrames || {}) };
+    look.pageCaps = look.pageCaps ? [...look.pageCaps] : [...T8_CAPS];
+    ch.pages.forEach((q, i) => {
+      if (!q) return;
+      if (q.zoom !== undefined && fm.photos[i]) look.pageFrames[fm.photos[i]] = { zoom: q.zoom, x: q.x, y: q.y };
+      if (typeof q.cap === 'string') look.pageCaps[i] = q.cap;
+    });
+  }
+  look.at = Math.max(Date.now(), ((fm.look && +fm.look.at) || 0) + 1); // always newer than the last one, even if the clock steps back
+  f.look = look;
+  return saveForm(id, f);
 }
 
 /* sub IDs carry the template: when it changed, get a fresh short link and swap it into the captions */

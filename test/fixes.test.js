@@ -165,3 +165,39 @@ test('queue page: plain pause banner with a guide link, first-run empty box, las
   h = queueView({ ...base, skipped: [{ ...d, status: 'skipped', updatedAt: Date.now() }] });
   assert.ok(h.includes('已跳过 · 1') && h.includes(`data-act="unskip" data-id="${d.id}"`));
 });
+
+test('在 Studio 精修 → 保存到草稿: what changed in the studio is kept, drawn on the poster, and product data stays the app\'s', async () => {
+  const { studioState, rm } = await import('../src/mapping.js');
+  const cfg = loadConfig(), id = drafts.list('draft')[0].id;
+  svc.saveForm(id, { photos: [drafts.get(id).form.photos[0], 'up:up-extra.jpg'] });
+  const d0 = drafts.get(id), key0 = posterKey(d0, cfg), [p0, p1] = d0.form.photos;
+  svc.saveStudio(id, {
+    c1: '#1e90ff', size: 120, scrim: 999, align: 'center', font: 'Comic Sans', ctaText: '  点这里买  ', seal: true, proof: false, now: 'RM 1.00',
+    frames: [{ zoom: 150, x: 30, y: 70 }, { zoom: 90, x: -5, y: 200 }]
+  });
+  const d1 = drafts.get(id), lk = d1.form.look;
+  assert.equal(lk.c1, '#1e90ff'); assert.equal(lk.size, 120); assert.equal(lk.scrim, 80); assert.equal(lk.align, 'center');
+  assert.ok(!('font' in lk), 'only the studio\'s own fonts'); assert.equal(lk.ctaText, '点这里买');
+  assert.ok(!('seal' in lk), 'cannot bring back what the data turned off'); assert.equal(lk.proof, false);
+  assert.deepEqual(lk.frames, { [p0]: { zoom: 150, x: 30, y: 70 }, [p1]: { zoom: 100, x: 0, y: 100 } });
+  assert.equal(d1.form.l1, d0.form.l1, 'the headline was not touched in the studio');
+  const st = studioState(d1, cfg);
+  assert.equal(st.c1, '#1e90ff'); assert.equal(st.proof, false); assert.equal(st.ctaText, '点这里买');
+  assert.equal(st.now, rm(d1.p.price), 'the price stays the product\'s');
+  assert.deepEqual(st.photos[0], { src: p0, zoom: 150, x: 30, y: 70 });
+  assert.notEqual(posterKey(d1, cfg), key0);
+  /* a headline changed in the studio comes back; a bad colour doesn't; earlier studio changes stay */
+  svc.saveStudio(id, { l1: 'Studio 改的标题', c2: 'red;background:url(x)' });
+  const d2 = drafts.get(id);
+  assert.equal(d2.form.l1, 'Studio 改的标题'); assert.ok(!('c2' in d2.form.look)); assert.equal(d2.form.look.c1, '#1e90ff');
+  assert.ok(d2.form.look.at > lk.at, 'each studio save is newer than the one before (same millisecond too)');
+  /* an edit page opened before that studio save doesn't write its older look over it */
+  svc.saveForm(id, { l2: '编辑页改的', look: { ...d2.form.look, c1: '#000000', at: d2.form.look.at - 1 } });
+  assert.equal(drafts.get(id).form.look.c1, '#1e90ff'); assert.equal(drafts.get(id).form.l2, '编辑页改的');
+  /* a photo removed in the app takes its framing with it; 清除 removes the studio's styling */
+  svc.saveForm(id, { photos: [p0] });
+  assert.deepEqual(Object.keys(drafts.get(id).form.look.frames), [p0]);
+  svc.saveForm(id, { look: null });
+  assert.equal(drafts.get(id).form.look, undefined);
+  assert.equal(posterKey(drafts.get(id), cfg), posterKey({ ...d0, form: { ...d0.form, photos: [p0], l1: 'Studio 改的标题', l2: '编辑页改的' } }, cfg));
+});

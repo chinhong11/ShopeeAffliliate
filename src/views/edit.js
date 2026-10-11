@@ -19,6 +19,7 @@ export function editView({ brand, d, st, cfg, count, dirty }) {
           ${priceRow(p)}
           <div class="cm"><b>${commOf(p)}</b></div>
           ${priceWarn(d.priceChanged, '海报已按新价格更新。')}
+          <div class="look-note" id="lookNote"${d.form.look ? '' : ' hidden'}><span>✨ 这张海报用了 Studio 精修的样式（颜色、字体、照片位置等）</span><button class="btn btn-ghost btn-sm" id="lookClear">清除</button></div>
           <button class="btn btn-ghost btn-sm desk-only" id="studio">在 Studio 精修 ↗</button>
         </div>
       </div>
