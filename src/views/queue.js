@@ -18,7 +18,7 @@ export function posterBlock(d, st, { dirty = false, big = false } = {}) {
 }
 
 export const priceRow = p => `<div class="pr"><span class="now">${rm(p.price)}</span>${p.disc >= 10 ? `<span class="pct">-${Math.round(p.disc)}%</span>` : ''}<span class="rt">${rateOf(p) ? `<b>★${rateOf(p)}</b> · ` : ''}${fmtSold(p.sales)}</span></div>`;
-export const priceWarn = (pc, tail) => pc ? `<div class="warn"><b>价格变了</b> ${esc(pc.from)} → ${esc(pc.to)}（${esc(pc.fromPct || '—')} → ${esc(pc.toPct || '—')}）。${tail}</div>` : '';
+export const priceWarn = (pc, tail) => pc ? `<div class="warn"><b>价格变了</b> ${esc(pc.from)} → ${esc(pc.to)}${pc.fromPct !== pc.toPct ? `（${esc(pc.fromPct || '—')} → ${esc(pc.toPct || '—')}）` : ''}。${tail}</div>` : '';
 
 function card(d, st) {
   const p = d.p;
@@ -40,9 +40,10 @@ function card(d, st) {
   </article>`;
 }
 
-function slotCard(s, entry, paused, postedName) {
+/* posted: { name, at } of the slot's post (it can go out up to 2 h after the planned minute) */
+function slotCard(s, entry, paused, posted) {
   let cls, sub, name, href = '';
-  if (s.status === 'used') { cls = 'filled'; sub = s.plannedAt ? fmtTime(s.plannedAt) + ' 已发' : '已发'; name = postedName || '已发布'; }
+  if (s.status === 'used') { cls = 'filled'; sub = posted ? fmtTime(posted.at) + ' 已发' : '已发'; name = posted ? shortName(posted.name) : '已发布'; }
   else if (s.status === 'returned') { cls = 'empty'; sub = '退回'; name = '查价变了，没有发'; }
   else if (s.status === 'failed') { cls = 'paused'; sub = '失败'; name = '发帖失败，看「已发布」'; }
   else if (s.status === 'skipped' || s.status === 'past') { cls = 'empty'; sub = '已过'; name = '没有批准的，这个时段跳过'; }
@@ -54,7 +55,7 @@ function slotCard(s, entry, paused, postedName) {
   return href ? `<a class="slot ${cls}" role="button" href="${href}">${inner}</a>` : `<div class="slot ${cls}">${inner}</div>`;
 }
 
-export function queueView({ brand, pending, approved, today, paused, collecting, lastCollect, collectError, posterState, postedNames }) {
+export function queueView({ brand, pending, approved, today, paused, collecting, lastCollect, collectError, posterState, posted }) {
   const failed = !collecting && collectError && (!lastCollect || collectError.at > lastCollect.at);
   const sub = collecting || (failed
     ? `${zhDate(collectError.at)} · ${fmtTime(collectError.at)} 抓取失败：${collectError.error}`
@@ -72,7 +73,7 @@ export function queueView({ brand, pending, approved, today, paused, collecting,
     </header>
     <div class="rv-scroll" id="scroll">
       ${paused ? `<div class="alert"><div class="at"><b>发布已暂停</b><p>${esc(paused.message)}</p></div><button class="btn btn-sm" data-act="token">重试</button></div>` : ''}
-      <div class="slots">${today.map(s => slotCard(s, todayEntries.find(x => x.slot.label === s.label), paused, postedNames[s.draftId])).join('')}</div>
+      <div class="slots">${today.map(s => slotCard(s, todayEntries.find(x => x.slot.label === s.label), paused, posted[s.draftId])).join('')}</div>
       ${pending.length
         ? `<div class="list">${pending.map(d => card(d, posterState(d))).join('')}</div>`
         : `<div class="empty"><b>今天的都处理完了</b><p>明天 08:00 自动抓新品，也可以现在抓一次。</p><button class="btn btn-ghost btn-sm" data-act="collect"${collecting ? ' disabled' : ''}>↻ 现在抓取</button></div>`}

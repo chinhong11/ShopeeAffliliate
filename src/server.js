@@ -95,12 +95,12 @@ const pendingCount = () => db.prepare("SELECT COUNT(*) n FROM drafts WHERE statu
 app.get('/', (req, res) => {
   const cfg = loadConfig();
   const posted = {};
-  for (const r of db.prepare("SELECT draft_id, name FROM posts WHERE kind='posted' AND at>=?").all(Date.now() - 2 * 86400e3)) posted[r.draft_id] = r.name;
+  for (const r of db.prepare("SELECT draft_id, name, at FROM posts WHERE kind='posted' AND at>=?").all(Date.now() - 2 * 86400e3)) posted[r.draft_id] = { name: r.name, at: r.at };
   const lc = kv.get('lastCollect');
   res.send(queueView({
     brand: brand(), pending: drafts.list('draft'), approved: svc.approvedWithSlots(cfg), today: todayView(cfg),
     paused: svc.pause.get(), collecting: svc.status.collecting, lastCollect: lc && lc.at > Date.now() - 36 * 3600e3 ? lc : null,
-    collectError: kv.get('lastCollectError'), posterState: d => posterState(d, cfg), postedNames: posted
+    collectError: kv.get('lastCollectError'), posterState: d => posterState(d, cfg), posted
   }));
 });
 

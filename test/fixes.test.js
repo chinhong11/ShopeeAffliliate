@@ -100,3 +100,22 @@ test('login limit: on a bare port X-Forwarded-For is ignored, so rotating it giv
   assert.deepEqual(codes, [401, 401, 401, 401, 429, 429, 429]);
   srv.close();
 });
+
+test('posted slot and 已发布 show the short name and the time the post actually went out', async () => {
+  const { queueView, priceWarn } = await import('../src/views/queue.js');
+  const { logView } = await import('../src/views/log.js');
+  const { fmtTime } = await import('../src/slots.js');
+  const planned = new Date(2026, 9, 11, 12, 41).getTime(), at = planned + 47 * 60e3; // posted late, e.g. after a pause
+  const raw = '【Ready Stock】辛拉面 甜辣泡菜炒面 5包装 🔥 COD';
+  const html = queueView({
+    brand: 'LEE', pending: [], approved: [], today: [{ label: '12:30', plannedAt: planned, status: 'used', draftId: 'd00000001' }],
+    paused: null, collecting: '', lastCollect: null, collectError: null, posterState: () => ({}), posted: { d00000001: { name: raw, at } }
+  });
+  assert.ok(html.includes(fmtTime(at) + ' 已发') && !html.includes(fmtTime(planned) + ' 已发'));
+  assert.ok(html.includes(shortName(raw)) && !html.includes('Ready Stock'));
+  const log = logView({ brand: 'LEE', count: 0, imgOf: () => '', rows: [{ id: 1, draft_id: 'd00000001', kind: 'posted', at, name: raw, tpl: 't1', strategy: 'top', sub_ids: '[]', permalink: 'https://www.facebook.com/x' }] });
+  assert.ok(log.includes(shortName(raw)) && !log.includes('Ready Stock'));
+  const pc = { from: 'RM 219.00', to: 'RM 251.85', fromPct: '-12%' };
+  assert.ok(!priceWarn({ ...pc, toPct: '-12%' }, '').includes('-12% → -12%'), 'an unchanged discount is not repeated');
+  assert.ok(priceWarn({ ...pc, toPct: '-20%' }, '').includes('-12% → -20%'));
+});
