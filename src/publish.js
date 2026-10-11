@@ -7,7 +7,7 @@ import * as shopee from './shopee.js';
 import * as fb from './facebook.js';
 import { productFromOffer, rm, pctOf, flashEnded } from './mapping.js';
 import { refreshCaptions, refreshHeadline, swapNumbers, postTexts } from './pick.js';
-import { ensurePoster, pause, posterFresh, syncShortLink } from './service.js';
+import { ensurePoster, pause, pauseText, fbWords, posterFresh, syncShortLink } from './service.js';
 import { posterFile } from './render.js';
 import { planDay, upcoming } from './slots.js';
 
@@ -146,7 +146,7 @@ export async function publishDraft(id, { slotId = null, dryRun = false, manual =
     post = d.form.tpl === 't8' ? await fb.postCarousel(images, pl.message) : await fb.postPhoto(images[0], pl.message);
   } catch (e) {
     const fatal = e instanceof fb.FbError && e.fatal;
-    if (fatal) pause.set(e.code, `Facebook 错误 ${e.code}：${e.message.replace(/^Facebook 错误 \d+: /, '')}。${e.code === 190 ? '到 Meta 重新生成 Page token，更新到服务器设置后点「重试」。' : '等一会儿再点「重试」。'}批准的帖子会继续排队。`);
+    if (fatal) pause.set(e.code, pauseText(e.code), undefined, fbWords(e.message));
     drafts.update(id, { status: fatal ? 'approved' : 'failed' }); // paused: stays queued for the next slot
     setSlot(slotId, 'failed', id);
     const msg = e instanceof fb.FbError && e.status === 599
@@ -167,7 +167,7 @@ export async function publishDraft(id, { slotId = null, dryRun = false, manual =
     catch (e) {
       note = (e instanceof fb.FbError && e.status === 599 ? '帖子已发，发第一条评论时网络中断（评论可能发出去了）：' : '帖子已发，但第一条评论没发出去：')
         + e.message + '。请到 Facebook 看看，没有就手动补上链接评论。';
-      if (e instanceof fb.FbError && e.fatal) pause.set(e.code, e.message);
+      if (e instanceof fb.FbError && e.fatal) pause.set(e.code, pauseText(e.code), undefined, fbWords(e.message));
     }
   }
   const link = await fb.permalink(postId);

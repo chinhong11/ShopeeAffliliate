@@ -9,7 +9,7 @@ import { isAuthed, sessionCookie, clearCookie, tryLogin } from './auth.js';
 import * as svc from './service.js';
 import { todayView } from './slots.js';
 import { posterKey, studioState, STRATS, TPL } from './mapping.js';
-import { thumbFile, posterFile, closeBrowser } from './render.js';
+import { thumbFile, viewFile, posterFile, closeBrowser } from './render.js';
 import * as fb from './facebook.js';
 import * as publish from './publish.js';
 import { startJobs, stopJobs } from './jobs.js';
@@ -72,10 +72,12 @@ app.use((req, res, next) => {
 app.use('/studio', express.static(path.join(ROOT, 'studio')));
 app.get('/shared/:f', (req, res) => ['mapping.js', 'pick.js'].includes(req.params.f) ? sendFile(res, path.join(ROOT, 'src', req.params.f), 'text/javascript') : res.status(404).end());
 app.get('/posters/:f', (req, res) => {
-  const m = /^(d[0-9a-f]+)(?:-([1-4]))?\.(png|jpg)$/.exec(req.params.f);
-  if (!m) return res.status(404).end();
+  /* {id}.png, {id}-1..4.png (t8 pages), {id}.jpg (card), {id}-v.jpg (edit page) */
+  const m = /^(d[0-9a-f]+)(?:-([1-4]|v))?\.(png|jpg)$/.exec(req.params.f);
+  const file = !m ? null : m[3] === 'png' ? (m[2] === 'v' ? null : posterFile(m[1], m[2] ? +m[2] : 0)) : !m[2] ? thumbFile(m[1]) : m[2] === 'v' ? viewFile(m[1]) : null;
+  if (!file) return res.status(404).end();
   res.set('Cache-Control', 'private, max-age=31536000'); // URLs carry ?k=posterKey
-  sendFile(res, m[3] === 'jpg' ? thumbFile(m[1]) : posterFile(m[1], m[2] ? +m[2] : 0));
+  sendFile(res, file);
 });
 app.get('/img/:f', (req, res) => {
   if (!/^[\w.-]+$/.test(req.params.f)) return res.status(404).end();
@@ -88,7 +90,7 @@ app.get('/img/:f', (req, res) => {
    so a spinner always means a render is really on its way */
 const posterState = (d, cfg) => {
   if (!d.posterError && !svc.posterFresh(d, cfg)) svc.queuePosters([d.id]);
-  return { hasPoster: fs.existsSync(thumbFile(d.id)), busy: svc.status.rendering.has(d.id) || svc.status.queued.has(d.id) };
+  return { hasPoster: fs.existsSync(thumbFile(d.id)), hasView: fs.existsSync(viewFile(d.id)), busy: svc.status.rendering.has(d.id) || svc.status.queued.has(d.id) };
 };
 const pendingCount = () => db.prepare("SELECT COUNT(*) n FROM drafts WHERE status='draft'").get().n;
 
@@ -100,7 +102,10 @@ app.get('/', (req, res) => {
   res.send(queueView({
     brand: brand(), pending: drafts.list('draft'), approved: svc.approvedWithSlots(cfg), today: todayView(cfg),
     paused: svc.pause.get(), collecting: svc.status.collecting, lastCollect: lc && lc.at > Date.now() - 36 * 3600e3 ? lc : null,
-    collectError: kv.get('lastCollectError'), posterState: d => posterState(d, cfg), posted
+    collectError: kv.get('lastCollectError'), posterState: d => posterState(d, cfg), posted,
+    /* skipped drafts that can still be approved (3 days), newest first: 恢复 brings one back */
+    skipped: drafts.list('skipped').filter(d => d.pendingSince > Date.now() - svc.EXPIRE_MS).sort((a, b) => b.updatedAt - a.updatedAt),
+    hasThumb: d => fs.existsSync(thumbFile(d.id)), collectAt: cfg.collectAt, expireMs: svc.EXPIRE_MS
   }));
 });
 
@@ -164,7 +169,7 @@ api.post('/drafts/:id/unapprove', wrap(req => svc.unapprove(req.params.id)));
 api.post('/drafts/:id/save', wrap(async req => {
   const d = svc.saveForm(req.params.id, req.body.form);
   if (req.body.render) { await svc.ensurePoster(d.id); }
-  else if (!svc.posterFresh(d)) svc.queuePosters([d.id]);
+  else if (req.body.queue && !svc.posterFresh(d)) svc.queuePosters([d.id]); // leaving the page: refresh the poster in the background (autosaves don't)
   const n = drafts.get(d.id);
   return { form: n.form, posterKey: n.posterKey, posterError: n.posterError };
 }));
@@ -186,7 +191,7 @@ api.post('/token', wrap(async () => {
   const r = await fb.checkToken();
   if (r.ok) { svc.pause.clear(); return { ok: true }; }
   if (r.transient) return { ok: false, error: '暂时连不上 Facebook（' + r.problems.join('；') + '），过几分钟再点重试' };
-  svc.pause.set(190, 'Facebook token 有问题：' + r.problems.join('；') + '。到 Meta 重新生成 Page token，更新到服务器设置后点「重试」。批准的帖子会继续排队。', 'token');
+  svc.pause.set(190, svc.pauseText(190, r.problems), 'token', svc.fbWords(r.detail));
   return { ok: false, error: r.problems.join('；') };
 }));
 api.post('/posts/:id/retry', wrap(req => publish.retryPost(Number(req.params.id))));
@@ -201,7 +206,7 @@ export async function start() {
   const stale = [...drafts.list('draft'), ...drafts.list('approved')].filter(d => !svc.posterFresh(d, cfg) && !d.posterError).map(d => d.id);
   if (stale.length) svc.queuePosters(stale);
   const srv = app.listen(env.PORT, () => console.log(`review app on http://localhost:${env.PORT}${env.SHOPEE_MOCK ? ' (SHOPEE_MOCK)' : ''}`));
-  if (telegram.init({ onCollected: svc.onCollected, onCollectFailed: svc.onCollectFailed, onPublishEvent: publish.onPublishEvent, onPause: svc.onPause })) console.log('telegram on');
+  if (telegram.init({ onCollected: svc.onCollected, onCollectFailed: svc.onCollectFailed, onPublishEvent: publish.onPublishEvent, onPause: svc.onPause, onReminder: svc.onReminder })) console.log('telegram on');
   if (process.env.DISABLE_JOBS !== '1') startJobs();
   const stop = async () => { console.log('shutting down'); stopJobs(); srv.close(); await closeBrowser(); process.exit(0); };
   process.on('SIGTERM', stop); process.on('SIGINT', stop);

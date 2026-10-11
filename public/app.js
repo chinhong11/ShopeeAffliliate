@@ -20,8 +20,11 @@ export function toast(msg, undo) {
   const slot = $('#toast-slot');
   slot.innerHTML = `<div class="toast"><span></span>${undo ? '<button>撤销</button>' : ''}</div>`;
   slot.querySelector('span').textContent = msg;
-  if (undo) slot.querySelector('button').onclick = () => { slot.innerHTML = ''; undo(); };
-  toastT = setTimeout(() => { slot.innerHTML = ''; }, undo ? 5000 : 2600);
+  const close = () => { clearTimeout(toastT); slot.innerHTML = ''; };
+  slot.querySelector('.toast').onclick = e => { if (!e.target.closest('button')) close(); }; // tap to close
+  if (undo) slot.querySelector('button').onclick = () => { close(); undo(); };
+  /* long enough to read (about 5 characters a second): at least 3 s, 8 s when it can be undone, at most 12 s */
+  toastT = setTimeout(close, Math.min(12000, Math.max(undo ? 8000 : 3000, 1500 + String(msg).length * 200)));
 }
 try { const t = sessionStorage.getItem('rvToast'); if (t) { sessionStorage.removeItem('rvToast'); toast(t); } } catch {}
 export const toastNext = msg => { try { sessionStorage.setItem('rvToast', msg); } catch {} };
@@ -33,7 +36,9 @@ export async function refresh() {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const main = doc.querySelector('#main');
   if (!main) { location.reload(); return; }
+  const open = [...document.querySelectorAll('details[open][id]')].map(n => n.id); // keep 已跳过 open across refreshes
   $('#main').replaceWith(main);
+  for (const id of open) { const n = document.getElementById(id); if (n) n.open = true; }
   document.querySelectorAll('.tabs, .topnav nav').forEach((n, i) => { const m = doc.querySelectorAll('.tabs, .topnav nav')[i]; if (m) n.innerHTML = m.innerHTML; });
   const ns = $('#scroll'); if (ns) ns.scrollTop = top;
   watch();
@@ -80,6 +85,7 @@ const ACT = {
     toast('已跳过', async () => { await api(`/drafts/${id}/unskip`, {}); await refresh(); });
   },
   async unapprove(id) { await api(`/drafts/${id}/unapprove`, {}); await refresh(); toast('已撤回，回到待审核'); },
+  async unskip(id) { await api(`/drafts/${id}/unskip`, {}); await refresh(); toast('已恢复，回到待审核'); },
   async render(id) {
     if ($('#ed')) { document.dispatchEvent(new CustomEvent('rv:render', { detail: id })); return; } // edit screen re-renders itself
     api(`/drafts/${id}/render`, {}).catch(e => toast(e.message)); setTimeout(refresh, 300);

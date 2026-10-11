@@ -8,7 +8,7 @@ export function editView({ brand, d, st, cfg, count, dirty }) {
   const body = `<div class="ed" id="ed">
     <div class="ed-top">
       <a class="back" href="/" id="back">‹ 返回</a>
-      <b class="tt">${d.status === 'approved' ? '已批准的草稿' : '编辑草稿'}</b>
+      <b class="tt">${d.status === 'approved' ? '已批准的草稿' : '编辑草稿'}<small class="sv" id="sv" aria-live="polite"></small></b>
       <span class="chip ${d.strat}">${STRATS[d.strat].zh}</span>
     </div>
     <div class="rv-scroll" id="scroll"><div class="ed-grid">

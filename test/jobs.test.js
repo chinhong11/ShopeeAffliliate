@@ -58,7 +58,7 @@ test('cleanup: big posters of finished drafts after 2 days, thumbnails + photos 
   const touch = (dir, f) => { const p = path.join(dir, f); fs.writeFileSync(p, 'x'); const t = new Date(now - 3 * day); fs.utimesSync(p, t, t); };
   const mk = (id, status, age, photo) => {
     ins.run(id, id, id, 'top', status, '{}', form(['img:' + photo]), dayStr(now - age), now - age, now - age, now - age);
-    for (const f of [`${id}.png`, `${id}.jpg`, `${id}-1.png`]) touch(dirs.out, f);
+    for (const f of [`${id}.png`, `${id}.jpg`, `${id}-1.png`, `${id}-v.jpg`]) touch(dirs.out, f);
     touch(dirs.img, photo);
   };
   mk('d0000aaa1', 'approved', 40 * day, 'live.jpg');   // live: keep everything
@@ -67,8 +67,8 @@ test('cleanup: big posters of finished drafts after 2 days, thumbnails + photos 
   touch(dirs.out, 'd0000aaa9.png.tmp');                // stray temp file
   jobs.cleanupFiles(now);
   const out = new Set(fs.readdirSync(dirs.out)), img = new Set(fs.readdirSync(dirs.img));
-  for (const f of ['d0000aaa1.png', 'd0000aaa1.jpg', 'd0000aaa1-1.png', 'd0000aaa2.jpg']) assert.ok(out.has(f), f);
-  for (const f of ['d0000aaa2.png', 'd0000aaa2-1.png', 'd0000aaa3.png', 'd0000aaa3.jpg', 'd0000aaa9.png.tmp']) assert.ok(!out.has(f), f);
+  for (const f of ['d0000aaa1.png', 'd0000aaa1.jpg', 'd0000aaa1-1.png', 'd0000aaa1-v.jpg', 'd0000aaa2.jpg']) assert.ok(out.has(f), f);
+  for (const f of ['d0000aaa2.png', 'd0000aaa2-1.png', 'd0000aaa2-v.jpg', 'd0000aaa3.png', 'd0000aaa3.jpg', 'd0000aaa3-v.jpg', 'd0000aaa9.png.tmp']) assert.ok(!out.has(f), f);
   assert.ok(img.has('live.jpg') && img.has('recent.jpg') && !img.has('gone.jpg'));
 });
 
@@ -135,4 +135,31 @@ test('backup keeps the newest 7', async () => {
   assert.equal(left.length, 7);
   assert.equal(left[6], path.basename(f));
   assert.ok(!left.includes('app-2020-01-01.db'));
+});
+
+test('reminder: an hour before a posting time nothing approved will fill, once, only while drafts wait', async () => {
+  db.prepare("DELETE FROM drafts").run(); svc.pause.clear();
+  const got = []; svc.onReminder(r => got.push(r));
+  const at = (h, m) => new Date(2032, 2, 3, h, m).getTime(), day = dayStr(at(12, 0));
+  db.prepare('DELETE FROM slots WHERE day=?').run(day);
+  planDay(day, { ...cfg, jitterMinutes: 0 });
+  assert.equal(jobs.remindDue(at(11, 45)), null, 'no drafts waiting: nothing to approve');
+  ins.run('drem00001', 'r1', 'r1', 'top', 'draft', '{}', form([]), day, at(8, 0), at(8, 0), at(8, 0));
+  assert.equal(jobs.remindDue(at(11, 15)), null, 'more than an hour before 12:30');
+  const r = jobs.remindDue(at(11, 45));
+  assert.equal(r.label, '12:30'); assert.equal(r.pending, 1);
+  assert.equal(jobs.remindDue(at(11, 50)), null, 'once per posting time');
+  await new Promise(res => setImmediate(res));
+  assert.equal(got.length, 1);
+  /* an approved draft will take 20:30: no reminder for it */
+  ins.run('drem00002', 'r2', 'r2', 'top', 'approved', '{}', form([]), day, at(8, 0), at(8, 0), at(8, 0));
+  db.prepare("UPDATE drafts SET approved_at=? WHERE id='drem00002'").run(at(9, 0));
+  assert.equal(jobs.remindDue(at(19, 45)), null);
+  /* paused: the pause message already went out */
+  db.prepare("UPDATE drafts SET status='skipped' WHERE id='drem00002'").run();
+  svc.pause.set(190, 'x', 'token');
+  assert.equal(jobs.remindDue(at(19, 45)), null);
+  svc.pause.clear();
+  assert.equal(jobs.remindDue(at(19, 45)).label, '20:30');
+  db.prepare("DELETE FROM drafts").run();
 });

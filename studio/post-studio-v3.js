@@ -222,7 +222,32 @@ function applyVars(){
   post.style.setProperty('--titlefont',state.font+',sans-serif');
   post.style.setProperty('--burst','polygon(50% 0%,60% 12%,74% 4%,78% 19%,94% 17%,90% 32%,100% 40%,89% 50%,100% 60%,90% 68%,94% 83%,78% 81%,74% 96%,60% 88%,50% 100%,40% 88%,26% 96%,22% 81%,6% 83%,10% 68%,0% 60%,11% 50%,0% 40%,10% 32%,6% 17%,22% 19%,26% 4%,40% 12%)');
   cls('mk',state.hl);
+  fitText();
 }
+/* ---------------- fit (real product data is longer than the demo values) ----------------
+   headline: every typed line stays on one line — shrink it (down to 75 %) instead of leaving a word alone on a new line;
+   a line that still wraps at 75 % is long on purpose and keeps the chosen size.
+   t2 big price: shrinks so it ends left of the 评论区拿链接 button instead of running under it. */
+function fitLine1(){
+  const el=$('line1'),ink=el.querySelector('.ink');
+  el.style.fontSize='';
+  const t=ink.textContent;if(!t.trim()||el.style.display==='none')return;
+  const want=t.split('\n').length;
+  /* lines drawn = distinct tops of the text's line boxes (a typed line break adds an empty box on its own line) */
+  const lines=()=>new Set([...ink.getClientRects()].filter(r=>r.width>1).map(r=>Math.round(r.top))).size;
+  if(lines()<=want)return;
+  const base=parseFloat(getComputedStyle(el).fontSize);
+  for(let k=0.97;k>=0.749;k-=0.03){el.style.fontSize=(base*k).toFixed(1)+'px';if(lines()<=want)return;}
+  el.style.fontSize='';
+}
+function fitBigPrice(){
+  const now=$('bpNow');now.style.fontSize='';
+  if(state.tpl!=='t2'||!state.price||!now.textContent)return;
+  const cta=$('ctaFloat'),edge=state.cta&&getComputedStyle(cta).display!=='none'?cta.offsetLeft-24:$('post').offsetWidth-56;
+  const avail=edge-$('bigPrice').offsetLeft,w=now.scrollWidth;
+  if(w>avail)now.style.fontSize=Math.floor(parseFloat(getComputedStyle(now).fontSize)*avail/w)+'px';
+}
+function fitText(){fitLine1();fitBigPrice();}
 function applyText(){
   const t8p=state.tpl==='t8'&&state.set.active>0;
   const l1=t8p?(state.set.pages[state.set.active].cap||''):state.l1;
@@ -234,6 +259,7 @@ function applyText(){
   const cap=$('caption');
   cap.style.alignItems=state.align==='center'?'center':state.align==='right'?'flex-end':'flex-start';
   cap.style.textAlign=state.align;
+  fitText();
 }
 function applyConv(){
   const pct=state.pct||autoPct();
@@ -253,6 +279,7 @@ function applyConv(){
   cls('has-arrow',state.arrow);
   cls('no-shopee',!state.shopee);
   cls('no-bar',!(state.proof||state.voucher||state.cta||state.shopee));
+  fitText();
 }
 function applyBrand(){
   $('badge').style.display=state.badge?'':'none';
@@ -354,6 +381,7 @@ function applyTemplate(){
   $('pageNo').textContent=(state.set.active+1)+' / 4';
   document.querySelectorAll('.tpl').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tpl===t));
   requestAnimationFrame(()=>{applyPhotos();});
+  fitText();
 }
 function applyAll(){
   applyVars();applyTemplate();applyText();applyConv();applyBrand();
@@ -710,9 +738,10 @@ function init(){
       state=n;cdStamp=Date.now();
       renderHooks();renderCtaChips();syncControls();applyAll();
       if(opt.persist)save();
-      await document.fonts.ready;await settle();applyPhotos();await settle();
+      await document.fonts.ready;fitText();await settle();applyPhotos();await settle();
       return true;
     },
+    fit:()=>fitText(), // re-measure after the page's fonts changed (the renderer trims them before exporting)
     exportPng:()=>snapshot(),
     async exportSet(){
       const out=[],orig=state.set.active;
@@ -724,6 +753,7 @@ function init(){
   };
   syncControls();
   applyAll();
+  document.fonts.addEventListener('loadingdone',fitText); // sizes measured with a fallback font are redone
 }
 function syncControls(){
   $('l1text').value=state.l1;$('l2text').value=state.l2;

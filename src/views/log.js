@@ -37,7 +37,7 @@ export function logView({ brand, rows, count, imgOf }) {
     </div>`;
   };
   const body = `
-    <header class="rv-head"><div class="grow"><h1>已发布</h1><div class="hsub">每条链接都带 sub ID，用来统计哪个模板卖得好</div></div></header>
+    <header class="rv-head"><div class="grow"><h1>已发布</h1><div class="hsub">每条链接都带追踪码（Shopee 报告里的 Sub ID），以后用来统计哪个模板卖得好</div></div></header>
     <div class="rv-scroll" id="scroll">
       ${groups.length ? groups.map(g => `<section><div class="lbl">${esc(g.label)}</div><div class="lgc">${g.items.map(item).join('')}</div></section>`).join('')
         : '<div class="empty" style="margin-top:8px"><b>还没有发布记录</b><p>批准的草稿会在发帖时段自动发到 Facebook 专页。</p></div>'}

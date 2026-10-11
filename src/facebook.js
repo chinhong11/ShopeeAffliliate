@@ -90,13 +90,14 @@ export async function checkToken() {
     return { ok: false, transient, problems: [e.message], error: e };
   }
   const p = [];
-  if (!d.is_valid) p.push('token 无效' + (d.error ? '：' + d.error.message : ''));
-  if (d.type !== 'PAGE') p.push(`type 是 ${d.type || '?'}，要 PAGE`);
-  if (env.FB_PAGE_ID && String(d.profile_id) !== String(env.FB_PAGE_ID)) p.push(`profile_id ${d.profile_id || '?'} 不是 FB_PAGE_ID ${env.FB_PAGE_ID}`);
+  if (!d.is_valid) p.push('token 无效');
+  if (d.type !== 'PAGE') p.push(`这不是专页 token（类型是 ${d.type || '?'}）`);
+  if (env.FB_PAGE_ID && String(d.profile_id) !== String(env.FB_PAGE_ID)) p.push(`这个 token 属于另一个专页（${d.profile_id || '?'}），不是 FB_PAGE_ID ${env.FB_PAGE_ID}`);
   const missing = SCOPES.filter(s => !(d.scopes || []).includes(s));
   if (missing.length) p.push('缺权限 ' + missing.join(', '));
-  if (d.expires_at !== 0) p.push(d.expires_at ? `会过期（${new Date(d.expires_at * 1000).toISOString().slice(0, 10)}），要 expires_at: 0` : 'expires_at 不是 0');
-  return { ok: !p.length, problems: p, data: d };
+  if (d.expires_at !== 0) p.push(d.expires_at ? `这个 token 会在 ${new Date(d.expires_at * 1000).toISOString().slice(0, 10)} 过期，要用永不过期的专页 token` : '这个 token 会过期，要用永不过期的专页 token');
+  /* Facebook's own explanation (e.g. "the user changed their password"), shown apart from our summary */
+  return { ok: !p.length, problems: p, detail: (d.error && d.error.message) || '', data: d };
 }
 
 export const readPng = f => fs.readFileSync(f);

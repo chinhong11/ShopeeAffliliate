@@ -8,7 +8,7 @@ import { db, kv, dayStr } from './db.js';
 import { planDay, toMin, hhmm } from './slots.js';
 import { publishDue, recoverInterrupted } from './publish.js';
 import { checkToken } from './facebook.js';
-import { runCollect, pause, EXPIRE_MS } from './service.js';
+import { runCollect, pause, pauseText, fbWords, EXPIRE_MS, approvedWithSlots, remind } from './service.js';
 import { backup } from './backup.js';
 
 const log = (...a) => console.log(new Date().toISOString(), '[jobs]', ...a);
@@ -35,7 +35,23 @@ export async function tick() {
   busy = true;
   try { await publishDue({ log }); }
   catch (e) { log('publishDue failed:', e.message); }
-  finally { busy = false; }
+  try { remindDue(); } catch (e) { log('reminder failed:', e.message); }
+  busy = false;
+}
+
+/* an hour before a posting time that nothing approved will fill, while drafts are waiting: remind once */
+export function remindDue(now = Date.now()) {
+  if (pause.get()) return null; // the pause itself was reported
+  const pending = db.prepare("SELECT COUNT(*) n FROM drafts WHERE status='draft'").get().n;
+  if (!pending) return null;
+  const s = db.prepare("SELECT * FROM slots WHERE status='open' AND planned_at>? AND planned_at<=? ORDER BY planned_at").get(now, now + 3600e3);
+  if (!s || kv.get('reminded:' + s.id)) return null;
+  if (approvedWithSlots(loadConfig(), now).some(x => x.slot && x.slot.slotId === s.id)) return null;
+  kv.set('reminded:' + s.id, now);
+  const r = { label: s.label, plannedAt: s.planned_at, pending };
+  log(`reminder: nothing approved for ${s.label}, ${pending} drafts waiting`);
+  remind(r);
+  return r;
 }
 
 /* README: drafts not approved within 3 days expire (counted from when they last came up for review) */
@@ -60,8 +76,8 @@ export function cleanupFiles(now = Date.now()) {
   const old = f => { try { return fs.statSync(f).mtimeMs < now - 86400e3; } catch { return false; } }; // never a file being written now
   let n = 0;
   for (const f of fs.readdirSync(dirs.out)) {
-    const m = /^(d[0-9a-f]+)(-[1-4])?\.(png|jpg)$/.exec(f), id = m && m[1];
-    const keep = m && (keepAll.has(id) || (m[3] === 'jpg' && keepThumb.has(id)));
+    const m = /^(d[0-9a-f]+)(-[1-4]|-v)?\.(png|jpg)$/.exec(f), id = m && m[1];
+    const keep = m && (keepAll.has(id) || (m[3] === 'jpg' && !m[2] && keepThumb.has(id))); // the -v.jpg goes with the big PNG
     if (!keep && old(path.join(dirs.out, f))) { fs.unlinkSync(path.join(dirs.out, f)); n++; }
   }
   for (const f of fs.readdirSync(dirs.img)) {
@@ -83,12 +99,13 @@ export async function tokenCheck() {
   }
   if (r.transient) { log('debug_token could not be checked, retrying later:', r.problems.join('; ')); return r; }
   log('debug_token problems:', r.problems.join('; '));
-  pause.set(190, 'Facebook token 有问题：' + r.problems.join('；') + '。到 Meta 重新生成 Page token，更新到服务器设置后点「重试」。批准的帖子会继续排队。', 'token');
+  pause.set(190, pauseText(190, r.problems), 'token', fbWords(r.detail));
   return r;
 }
 
 export function daily() {
   const cfg = loadConfig();
+  db.prepare("DELETE FROM kv WHERE k LIKE 'reminded:%' AND CAST(substr(k, 10) AS INTEGER) IN (SELECT id FROM slots WHERE planned_at<?)").run(Date.now());
   planDay(dayStr(), cfg);
   expireDrafts();
   cleanupFiles();

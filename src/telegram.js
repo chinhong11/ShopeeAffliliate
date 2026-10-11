@@ -7,6 +7,7 @@ import { drafts } from './db.js';
 import { rm, STRATS, shortName } from './mapping.js';
 import { thumbFile, posterFile } from './render.js';
 import * as svc from './service.js';
+import { fmtTime } from './slots.js';
 
 const API = () => `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${env.TELEGRAM_BOT_TOKEN}`;
 export const enabled = () => !!(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID);
@@ -91,7 +92,7 @@ export async function setWebhook() {
 }
 
 /* reports: collect → posters, post success / failure / returned, token problems */
-export function init({ onCollected, onCollectFailed, onPublishEvent, onPause }) {
+export function init({ onCollected, onCollectFailed, onPublishEvent, onPause, onReminder }) {
   if (!enabled()) return false;
   onCollected(r => sendDrafts(r.drafts).then(() => r.created ? null : send('今天没有抓到新品（都发过了或不达标）')));
   if (onCollectFailed) onCollectFailed(e => send(`⚠️ 抓取失败：${e.message}${env.PUBLIC_URL ? '\n' + env.PUBLIC_URL : ''}`));
@@ -101,7 +102,8 @@ export function init({ onCollected, onCollectFailed, onPublishEvent, onPause }) 
     if (type === 'failed') send(`❌ 发帖失败：${n}\n${message}\n${env.PUBLIC_URL ? env.PUBLIC_URL + '/log' : ''}`);
     if (type === 'returned') send(`↩️ 没有发：${n}\n${message}`);
   });
-  onPause(p => send(`🛑 发布已暂停\n${p.message}${env.PUBLIC_URL ? '\n' + env.PUBLIC_URL : ''}`));
+  if (onReminder) onReminder(r => send(`⏰ ${r.label} 的帖子还没有批准（约 ${fmtTime(r.plannedAt)} 发）\n还有 ${r.pending} 张草稿等你审核，没批准的话这个时段会跳过。${env.PUBLIC_URL ? '\n' + env.PUBLIC_URL : ''}`));
+  onPause(p => send(`🛑 发布已暂停\n${p.message}${p.detail ? '\nFacebook 原话：' + p.detail : ''}${env.PUBLIC_URL ? '\n' + env.PUBLIC_URL : ''}`));
   setWebhook();
   return true;
 }

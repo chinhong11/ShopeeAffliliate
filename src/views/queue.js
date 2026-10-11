@@ -1,14 +1,17 @@
 /* 待审核 (home) */
-import { esc, page } from './html.js';
+import { esc, page, GUIDE } from './html.js';
 import { STRATS, TPL, rm, fmtSold, shortName, commOf, rateOf } from '../mapping.js';
-import { fmtTime } from '../slots.js';
+import { fmtTime, toMin } from '../slots.js';
+import { dayStr } from '../db.js';
 
 export const zhDate = t => { const d = new Date(t); return `${d.getMonth() + 1}月${d.getDate()}日 周${'日一二三四五六'[d.getDay()]}`; };
 
 /* poster block: rendered thumb, or the Shopee photo dimmed with a spinner / error */
 export function posterBlock(d, st, { dirty = false, big = false } = {}) {
   const has = st.hasPoster, busy = st.busy, err = !busy && d.posterError;
-  const src = has ? `/posters/${d.id}.${big ? 'png' : 'jpg'}?k=${encodeURIComponent(d.posterKey || '')}` : `/img/${encodeURIComponent(d.p.img)}`;
+  /* the edit page shows the 1080px JPEG (the PNG only for posters made before it existed) */
+  const file = !big ? `${d.id}.jpg` : st.hasView ? `${d.id}-v.jpg` : `${d.id}.png`;
+  const src = has ? `/posters/${file}?k=${encodeURIComponent(d.posterKey || '')}` : `/img/${encodeURIComponent(d.p.img)}`;
   return `<div class="pvw${has ? '' : ' raw'}" data-poster="${d.id}"${busy ? ' data-pending="1"' : ''}>
     <img src="${src}" alt="" loading="lazy">
     ${busy ? `<div class="pv-over"><i class="spin"></i><span>${has ? '重新生成中…' : '生成海报中…'}</span></div>` : ''}
@@ -20,7 +23,14 @@ export function posterBlock(d, st, { dirty = false, big = false } = {}) {
 export const priceRow = p => `<div class="pr"><span class="now">${rm(p.price)}</span>${p.disc >= 10 ? `<span class="pct">-${Math.round(p.disc)}%</span>` : ''}<span class="rt">${rateOf(p) ? `<b>★${rateOf(p)}</b> · ` : ''}${fmtSold(p.sales)}</span></div>`;
 export const priceWarn = (pc, tail) => pc ? `<div class="warn"><b>价格变了</b> ${esc(pc.from)} → ${esc(pc.to)}${pc.fromPct !== pc.toPct ? `（${esc(pc.fromPct || '—')} → ${esc(pc.toPct || '—')}）` : ''}。${tail}</div>` : '';
 
-function card(d, st) {
+/* drafts can be approved for 3 days; the last day says so */
+function expiry(d, expireMs, now) {
+  const at = d.pendingSince + expireMs;
+  if (!expireMs || at - now > 86400e3) return '';
+  return `<div class="exp">⏳ ${dayStr(at) === dayStr(now) ? '今天' : '明天'} ${fmtTime(at)} 过期，过了就不能批准</div>`;
+}
+
+function card(d, st, expireMs, now) {
   const p = d.p;
   return `<article class="card" data-id="${d.id}">
     <a class="pv" href="/d/${d.id}">${posterBlock(d, st)}
@@ -28,6 +38,7 @@ function card(d, st) {
     </a>
     <div class="bd">
       ${priceWarn(d.priceChanged, '海报已按新价格更新，确认后再批准。')}
+      ${expiry(d, expireMs, now)}
       <h3 class="nm">${esc(p.name)}</h3>
       ${priceRow(p)}
       <div class="cm"><b>${commOf(p)}</b> · ${TPL[d.form.tpl]}</div>
@@ -55,7 +66,20 @@ function slotCard(s, entry, paused, posted) {
   return href ? `<a class="slot ${cls}" role="button" href="${href}">${inner}</a>` : `<div class="slot ${cls}">${inner}</div>`;
 }
 
-export function queueView({ brand, pending, approved, today, paused, collecting, lastCollect, collectError, posterState, posted }) {
+/* the publishing pause banner: plain reason, Facebook's own words apart, and the guide section that fixes it */
+const pauseBanner = p => `<div class="alert"><div class="at"><b>发布已暂停</b><p>${esc(p.message)}</p>${p.detail ? `<p class="fbw">Facebook 原话：${esc(p.detail)}</p>` : ''}
+  <a class="help" href="${GUIDE}#${p.code === 190 ? 'if-the-facebook-token-stops-working' : 'if-posting-is-paused-for-another-reason'}" target="_blank" rel="noopener">${p.code === 190 ? '怎么重新生成 token' : '怎么处理'} ↗</a></div><button class="btn btn-sm" data-act="token">重试</button></div>`;
+
+/* empty queue: "all done" only when today's collect has run; the time follows config.collectAt */
+function emptyBox(lastCollect, collecting, collectAt = '08:00', now = Date.now()) {
+  const t = new Date(now), next = (t.getHours() * 60 + t.getMinutes() < toMin(collectAt) ? '今天 ' : '明天 ') + collectAt;
+  const done = lastCollect && dayStr(lastCollect.at) === dayStr(now);
+  const [h, p] = collecting ? ['正在抓新品…', '抓到的草稿会出现在这里。'] : done ? ['今天的都处理完了', `${next} 自动抓新品，也可以现在再抓一次。`] : ['还没有新草稿', `${next} 自动抓新品，也可以现在抓一次。`];
+  return `<div class="empty"><b>${h}</b><p>${p}</p><button class="btn btn-ghost btn-sm" data-act="collect"${collecting ? ' disabled' : ''}>↻ 现在抓取</button></div>`;
+}
+
+export function queueView({ brand, pending, approved, today, paused, collecting, lastCollect, collectError, posterState, posted, skipped = [], hasThumb = () => false, collectAt, expireMs = 0 }) {
+  const now = Date.now();
   const failed = !collecting && collectError && (!lastCollect || collectError.at > lastCollect.at);
   const sub = collecting || (failed
     ? `${zhDate(collectError.at)} · ${fmtTime(collectError.at)} 抓取失败：${collectError.error}`
@@ -72,17 +96,23 @@ export function queueView({ brand, pending, approved, today, paused, collecting,
       <button class="btn btn-ghost btn-sm" data-act="collect"${collecting ? ' disabled' : ''}>↻ 抓取</button>
     </header>
     <div class="rv-scroll" id="scroll">
-      ${paused ? `<div class="alert"><div class="at"><b>发布已暂停</b><p>${esc(paused.message)}</p></div><button class="btn btn-sm" data-act="token">重试</button></div>` : ''}
+      ${paused ? pauseBanner(paused) : ''}
       <div class="slots">${today.map(s => slotCard(s, todayEntries.find(x => x.slot.label === s.label), paused, posted[s.draftId])).join('')}</div>
       ${pending.length
-        ? `<div class="list">${pending.map(d => card(d, posterState(d))).join('')}</div>`
-        : `<div class="empty"><b>今天的都处理完了</b><p>明天 08:00 自动抓新品，也可以现在抓一次。</p><button class="btn btn-ghost btn-sm" data-act="collect"${collecting ? ' disabled' : ''}>↻ 现在抓取</button></div>`}
+        ? `<div class="list">${pending.map(d => card(d, posterState(d), expireMs, now)).join('')}</div>`
+        : emptyBox(lastCollect, collecting, collectAt, now)}
       ${approved.length ? `<div class="lbl">已批准 · 排队中 · ${approved.length}</div>
       <div class="qlist">${approved.map(({ d, slot }) => `<div class="qrow">
         <img src="${posterState(d).hasPoster ? `/posters/${d.id}.jpg?k=${encodeURIComponent(d.posterKey)}` : `/img/${encodeURIComponent(d.p.img)}`}" alt="">
         <a class="qt" href="/d/${d.id}"><b>${esc(shortName(d.p.name))}</b><span>✓ ${slot ? esc(slot.text) + ' 发布' : '等空位'}</span></a>
         <button class="btn btn-ghost btn-sm" data-act="unapprove" data-id="${d.id}">撤回</button>
       </div>`).join('')}</div>` : ''}
+      ${skipped.length ? `<details class="skp" id="skipped"><summary class="lbl">已跳过 · ${skipped.length} <span class="soft">点开可以恢复</span></summary>
+      <div class="qlist">${skipped.map(d => `<div class="qrow">
+        <img src="${hasThumb(d) ? `/posters/${d.id}.jpg?k=${encodeURIComponent(d.posterKey || '')}` : `/img/${encodeURIComponent(d.p.img)}`}" alt="">
+        <div class="qt"><b>${esc(shortName(d.p.name))}</b><span class="dim">${dayStr(d.updatedAt) === dayStr(now) ? '今天' : zhDate(d.updatedAt)} ${fmtTime(d.updatedAt)} 跳过</span></div>
+        <button class="btn btn-ghost btn-sm" data-act="unskip" data-id="${d.id}">恢复</button>
+      </div>`).join('')}</div></details>` : ''}
       <div class="endpad"></div>
     </div>`;
   return page({ title: '待审核', brand, body, tab: 'queue', count: pending.length });

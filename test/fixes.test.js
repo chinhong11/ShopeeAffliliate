@@ -119,3 +119,49 @@ test('posted slot and 已发布 show the short name and the time the post actual
   assert.ok(!priceWarn({ ...pc, toPct: '-12%' }, '').includes('-12% → -12%'), 'an unchanged discount is not repeated');
   assert.ok(priceWarn({ ...pc, toPct: '-20%' }, '').includes('-12% → -20%'));
 });
+
+test('poster key: a new short link or caption is not a new poster (except 好友爆料, whose chat shows the link)', () => {
+  const cfg = loadConfig(), d = drafts.get(a.id), k = posterKey(d, cfg);
+  assert.equal(posterKey({ ...d, shortLink: 'https://s.shopee.com.my/other' }, cfg), k);
+  assert.equal(posterKey({ ...d, form: { ...d.form, cap1: 'changed', cap1Manual: true } }, cfg), k);
+  assert.notEqual(posterKey({ ...d, form: { ...d.form, l1: '别的标题' } }, cfg), k);
+  const t4 = { ...d, form: { ...d.form, tpl: 't4', chat: { m1: '有货吗', m2: '有', m3: '链接' } } };
+  assert.notEqual(posterKey({ ...t4, shortLink: 'https://s.shopee.com.my/other' }, cfg), posterKey(t4, cfg));
+});
+
+test('已跳过: 恢复 within 3 days, not when too old or when the product already has a newer draft', () => {
+  const [x, y] = drafts.list('draft');
+  svc.skip(x.id); svc.unskip(x.id);
+  assert.equal(drafts.get(x.id).status, 'draft');
+  svc.skip(x.id);
+  drafts.update(x.id, { pendingSince: Date.now() - 3.1 * 86400e3 });
+  assert.throws(() => svc.unskip(x.id), /超过 3 天/);
+  drafts.update(x.id, { pendingSince: Date.now() });
+  db.prepare('UPDATE drafts SET item_id=? WHERE id=?').run(x.itemId, y.id); // a newer draft of the same product
+  assert.throws(() => svc.unskip(x.id), /已经有新的草稿/);
+  db.prepare('UPDATE drafts SET item_id=? WHERE id=?').run(y.itemId, y.id);
+  svc.unskip(x.id);
+  assert.equal(drafts.get(x.id).status, 'draft');
+  assert.throws(() => svc.unskip(x.id), /不在「已跳过」/);
+});
+
+test('queue page: plain pause banner with a guide link, first-run empty box, last-day note, 已跳过 list', async () => {
+  const { queueView } = await import('../src/views/queue.js');
+  const base = { brand: 'LEE', pending: [], approved: [], today: [], paused: null, collecting: '', lastCollect: null, collectError: null,
+    posterState: () => ({}), posted: {}, collectAt: '09:15', expireMs: svc.EXPIRE_MS };
+  let h = queueView(base);
+  assert.ok(h.includes('还没有新草稿') && h.includes('09:15 自动抓新品') && !h.includes('今天的都处理完了') && !h.includes('08:00'));
+  assert.ok(queueView({ ...base, lastCollect: { at: Date.now(), created: 3 } }).includes('今天的都处理完了'));
+  const paused = { code: 190, source: 'token', message: svc.pauseText(190, ['token 无效']),
+    detail: svc.fbWords('Facebook 错误 190: Error validating access token: Session has expired.') };
+  h = queueView({ ...base, paused });
+  assert.ok(h.includes('Facebook token 有问题：token 无效') && h.includes('Facebook 原话：Error validating access token: Session has expired<'));
+  assert.ok(h.includes('SETUP.md#if-the-facebook-token-stops-working') && !h.includes('.。'));
+  assert.ok(queueView({ ...base, paused: { code: 368, message: svc.pauseText(368), detail: '' } }).includes('#if-posting-is-paused-for-another-reason'));
+  const d = drafts.list('draft')[0];
+  const lastDay = { ...d, pendingSince: Date.now() - 2.5 * 86400e3 };
+  assert.ok(queueView({ ...base, pending: [lastDay] }).includes('过期，过了就不能批准'));
+  assert.ok(!queueView({ ...base, pending: [{ ...d, pendingSince: Date.now() }] }).includes('过期，过了就不能批准'));
+  h = queueView({ ...base, skipped: [{ ...d, status: 'skipped', updatedAt: Date.now() }] });
+  assert.ok(h.includes('已跳过 · 1') && h.includes(`data-act="unskip" data-id="${d.id}"`));
+});

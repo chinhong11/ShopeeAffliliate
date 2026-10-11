@@ -29,8 +29,8 @@ $('#form').innerHTML = `
   </section>
   <section class="sec">
     <div class="sec-h"><span class="ic">✍️</span><h2>标题</h2></div>
-    <div class="field"><label>主标题 <span class="soft">Enter 换行</span></label><textarea id="l1" rows="2" maxlength="60"></textarea></div>
-    <div class="field"><label>副标题</label><input id="l2" type="text" maxlength="60"></div>
+    <div class="field"><label for="l1">主标题 <span class="soft">Enter 换行</span></label><textarea id="l1" rows="2" maxlength="60"></textarea></div>
+    <div class="field"><label for="l2">副标题</label><input id="l2" type="text" maxlength="60"></div>
     <div class="field"><label>换一个 <span class="soft" id="hookNote"></span></label><div class="hooks" id="hooks"></div></div>
   </section>
   <section class="sec">
@@ -40,17 +40,17 @@ $('#form').innerHTML = `
     <div class="hint">第 1 张是 Shopee 商品图。加照片会自动换排版：2 张双图、3 张三图、4 张四宫格。</div>
   </section>
   <section class="sec">
-    <div class="toggle-row"><label>我用过这个 <span class="soft">打开后标题和文案可以写亲身体验</span></label><button class="toggle" id="used" aria-label="我用过这个"></button></div>
+    <div class="toggle-row"><label for="used">我用过这个 <span class="soft">打开后标题和文案可以写亲身体验</span></label><button class="toggle" id="used"></button></div>
   </section>
   <section class="sec">
     <div class="sec-h"><span class="ic">⭐</span><h2>买家真实评价</h2><span class="tip">填了才能用「真实好评」</span></div>
-    <div class="field"><textarea id="rq" rows="2" maxlength="80" placeholder="从 Shopee 评价区复制一条买家原话"></textarea></div>
-    <div class="field"><label>署名</label><input id="ra" type="text" maxlength="16" placeholder="— Shopee 买家"></div>
+    <div class="field"><textarea id="rq" rows="2" maxlength="80" placeholder="从 Shopee 评价区复制一条买家原话" aria-label="买家真实评价"></textarea></div>
+    <div class="field"><label for="ra">署名</label><input id="ra" type="text" maxlength="16" placeholder="— Shopee 买家"></div>
   </section>
   <section class="sec">
     <div class="sec-h"><span class="ic">💬</span><h2>Facebook 文案</h2><button class="btn btn-ghost btn-sm" id="rebuild" style="margin-left:auto" hidden>↻ 重新生成</button></div>
-    <div class="field"><label>① 帖子</label><textarea id="c1" rows="8"></textarea></div>
-    <div class="field"${direct ? ' hidden' : ''}><label>② 第一条评论 <span class="soft">发帖后自动发，带链接</span></label><textarea id="c2" rows="3"></textarea></div>
+    <div class="field"><label for="c1">① 帖子</label><textarea id="c1" rows="8"></textarea></div>
+    <div class="field"${direct ? ' hidden' : ''}><label for="c2">② 第一条评论 <span class="soft">发帖后自动发，带链接</span></label><textarea id="c2" rows="3"></textarea></div>
   </section>`;
 
 const el = id => document.getElementById(id);
@@ -76,10 +76,10 @@ function renderUnlock() {
   if (!unlock) { box.innerHTML = ''; return; }
   let inner = '<div class="uh"></div>';
   if (unlock === 't3') inner += `<div class="u2">
-      <div class="field"><label>结束时间</label><input type="time" id="fe" value="${esc(f.flash.end)}"></div>
-      <div class="field"><label>已抢 %</label><input type="text" id="fp" inputmode="numeric" maxlength="2" placeholder="82" value="${esc(f.flash.pct)}"></div></div>`;
+      <div class="field"><label for="fe">结束时间</label><input type="time" id="fe" value="${esc(f.flash.end)}"></div>
+      <div class="field"><label for="fp">已抢 %</label><input type="text" id="fp" inputmode="numeric" maxlength="2" placeholder="82" value="${esc(f.flash.pct)}"></div></div>`;
   if (unlock === 't4') inner += [['m1', '朋友问', '例：上次你说的那个还有货吗？'], ['m2', '你的回复（配产品照片）', '例：有！Shopee 现在 RM 19.90'], ['m3', '朋友反应', '例：快发我链接']]
-    .map(([k, l, ph]) => `<div class="field"><label>${l}</label><input type="text" data-chat="${k}" maxlength="40" placeholder="${esc(ph)}" value="${esc(f.chat[k])}"></div>`).join('');
+    .map(([k, l, ph]) => `<div class="field"><label for="chat-${k}">${l}</label><input type="text" id="chat-${k}" data-chat="${k}" maxlength="40" placeholder="${esc(ph)}" value="${esc(f.chat[k])}"></div>`).join('');
   box.innerHTML = `<div class="unlock">${inner}</div>`;
   renderTps();
 }
@@ -109,7 +109,7 @@ function setPoster(state, msg) {
   box.querySelectorAll('.pv-over').forEach(n => n.remove());
   if (state === 'busy') box.insertAdjacentHTML('beforeend', `<div class="pv-over"><i class="spin"></i><span>${box.classList.contains('raw') ? '生成海报中…' : '重新生成中…'}</span></div>`);
   if (state === 'err') box.insertAdjacentHTML('beforeend', `<div class="pv-over"><span>${esc(msg || '海报没生成出来')}</span></div>`);
-  if (state === 'ok') { box.classList.remove('raw'); box.removeAttribute('data-pending'); box.querySelector('img').src = `/posters/${d.id}.png?k=${encodeURIComponent(savedKey)}`; }
+  if (state === 'ok') { box.classList.remove('raw'); box.removeAttribute('data-pending'); box.querySelector('img').src = `/posters/${d.id}-v.jpg?k=${encodeURIComponent(savedKey)}`; }
 }
 function syncDirty() {
   const dirty = posterKey(draft(), cfg) !== savedKey;
@@ -181,11 +181,49 @@ el('file').onchange = async e => {
 };
 
 async function save(render) {
-  const r = await api(`/drafts/${d.id}/save`, { form: f, render });
-  savedForm = JSON.stringify(f);
+  const snap = JSON.stringify(f); // what this request saves; edits made while it runs are saved by the next one
+  const r = await api(`/drafts/${d.id}/save`, { form: JSON.parse(snap), render });
+  savedForm = snap;
   if (render) { savedKey = r.posterKey; if (r.posterError) throw new Error(r.posterError); }
   return r;
 }
+
+/* ---------- autosave: edits are saved a moment after you make them, and when the page is left ---------- */
+const unsaved = () => JSON.stringify(f) !== savedForm;
+let saving = null, retryAt = 0, lastErr = '', leaveAnyway = false;
+const savedNote = () => { const n = el('sv'); if (!n) return; n.textContent = '· 已保存'; clearTimeout(savedNote.t); savedNote.t = setTimeout(() => { n.textContent = ''; }, 2500); };
+function autosave() {
+  if (saving) return saving;
+  if (busy || !unsaved() || Date.now() < retryAt) return Promise.resolve();
+  saving = save(false).then(() => { lastErr = ''; savedNote(); }, err => {
+    retryAt = Date.now() + 10000;
+    if (err.message !== lastErr) { lastErr = err.message; toast('没保存成功：' + err.message); }
+    throw err;
+  }).finally(() => { saving = null; });
+  return saving;
+}
+setInterval(() => { autosave().catch(() => {}); }, 1500);
+/* save, then go: a failed save shows why and keeps you here once; tapping again leaves anyway */
+async function leave(href) {
+  if (!leaveAnyway && unsaved()) {
+    try { if (saving) await saving.catch(() => {}); if (unsaved()) { retryAt = 0; await autosave(); } }
+    catch (err) { leaveAnyway = true; toast(`没保存成功：${err.message}。再点一次就离开（这次的改动不保存）`); return; }
+  }
+  location.href = href;
+}
+/* phone back gesture, closing the tab, switching apps: send what's left (keepalive survives the page) */
+const flush = () => {
+  if (!unsaved()) return;
+  fetch(`/api/drafts/${d.id}/save`, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'rv' }, body: JSON.stringify({ form: f, render: false, queue: true }) }).catch(() => {});
+};
+addEventListener('pagehide', flush);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+/* the top menu / tabs and any other link in the page */
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[href]');
+  if (!a || e.defaultPrevented || a.target === '_blank' || a.origin !== location.origin || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+  e.preventDefault(); leave(a.href);
+});
 async function regenerate() {
   busy = true; syncDirty(); setPoster('busy');
   try { await save(true); setPoster('ok'); }
@@ -200,22 +238,19 @@ el('approve').onclick = async () => {
   busy = true; syncDirty();
   if (posterKey(draft(), cfg) !== savedKey) setPoster('busy');
   try {
-    const r = await api(`/drafts/${d.id}/approve`, { form: f });
+    const snap = JSON.stringify(f);
+    const r = await api(`/drafts/${d.id}/approve`, { form: JSON.parse(snap) });
+    savedForm = snap; // approving saved the form: nothing left for the leave-page flush
     toastNext(r.again ? '已保存修改' : '已批准 · ' + (r.slot || '等空位') + ' 发布');
     location.href = '/';
   } catch (e) { busy = false; syncDirty(); setPoster('none'); toast(e.message); }
-};
-/* back saves */
-el('back').onclick = async e => {
-  e.preventDefault();
-  try { if (JSON.stringify(f) !== savedForm) await save(false); } catch (err) { toast(err.message); return; }
-  location.href = '/';
 };
 /* desktop: open the studio with this draft loaded (and saved in the studio's own storage) */
 el('studio').onclick = async () => {
   const w = window.open('/studio/Shopee%20Post%20Maker%20v3.html', '_blank');
   try {
-    if (JSON.stringify(f) !== savedForm) await save(false);
+    if (saving) await saving;
+    if (unsaved()) await save(false);
     const st = await api(`/drafts/${d.id}/studio-state`);
     for (let i = 0; i < 200 && !(w && w.PostStudio); i++) await new Promise(r => setTimeout(r, 150));
     if (!w || !w.PostStudio) throw new Error('Studio 没打开（被浏览器拦截了？）');

@@ -157,13 +157,19 @@ export async function approve(id, form) {
   return { again, slot: slotOf(id) };
 }
 export function skip(id) { drafts.update(id, { status: 'skipped' }, { from: ['draft'] }); }
-export function unskip(id) { drafts.update(id, { status: 'draft' }, { from: ['skipped'] }); }
+export function unskip(id) {
+  const d = drafts.get(id);
+  if (!d || d.status !== 'skipped') throw new Error('这张草稿已经不在「已跳过」里了');
+  if (d.pendingSince < Date.now() - EXPIRE_MS) throw new Error('这张草稿超过 3 天了，不能恢复');
+  if (drafts.queuedItem(d.itemId)) throw new Error('这个商品已经有新的草稿了，不用恢复');
+  if (!drafts.update(id, { status: 'draft' }, { from: ['skipped'] })) throw new Error('这张草稿刚刚变了，刷新后再看');
+}
 export function unapprove(id) { drafts.update(id, { status: 'draft', approvedAt: 0, pendingSince: Date.now() }, { from: ['approved'] }); }
 
 /* approved drafts fill upcoming slots in approval order */
-export function approvedWithSlots(cfg = loadConfig()) {
+export function approvedWithSlots(cfg = loadConfig(), now = Date.now()) {
   const list = drafts.list('approved');
-  const sl = upcoming(list.length, cfg);
+  const sl = upcoming(list.length, cfg, now);
   return list.map((d, i) => ({ d, slot: sl[i] || null }));
 }
 export const slotOf = id => { const r = approvedWithSlots().find(x => x.d.id === id); return r && r.slot; };
@@ -182,17 +188,31 @@ export function savePhoto(id, dataUrl) {
   return 'up:' + name;
 }
 
-/* posting pause (Facebook token / rate-limit problems). source 'token' pauses are lifted by a passing token check. */
+/* posting pause (Facebook token / rate-limit problems). source 'token' pauses are lifted by a passing token check.
+   message: what happened and what to do, in plain words; detail: Facebook's own words, shown apart */
 const pauseListeners = [];
 export const onPause = fn => pauseListeners.push(fn);
 export const pause = {
   get: () => kv.get('publishPaused'),
-  set(code, message, source = code === 190 ? 'token' : 'post') {
-    const old = kv.get('publishPaused'), p = { code, message, source, at: Date.now() };
+  set(code, message, source = code === 190 ? 'token' : 'post', detail = '') {
+    const old = kv.get('publishPaused'), p = { code, message, detail, source, at: Date.now() };
     kv.set('publishPaused', p);
-    if (!old || old.message !== message) fire(pauseListeners, p);
+    if (!old || old.message !== message || (old.detail || '') !== detail) fire(pauseListeners, p);
   },
   clear: () => kv.del('publishPaused')
 };
+export const fbWords = m => String(m || '').replace(/^Facebook (错误 \d+|HTTP \d+): /, '').replace(/[\s.。!！]+$/, '');
+export function pauseText(code, problems = []) {
+  const queued = '批准的帖子会继续排队。';
+  if (code === 190) return `Facebook token ${problems.length ? '有问题：' + problems.join('；') : '失效了'}，帖子发不出去。到 Meta 重新生成 Page token，换掉服务器设置里的 FB_PAGE_TOKEN，再点「重试」。${queued}`;
+  if ([4, 17, 32].includes(code)) return `Facebook 说请求太频繁，暂时不让发。等一会儿再点「重试」。${queued}`;
+  if (code === 368) return `Facebook 暂时挡住了这个专页发帖（可能被当成垃圾或违规内容）。先到专页看看 Facebook 的通知，过一段时间再点「重试」。${queued}`;
+  return `Facebook 不让发帖（错误 ${code}）。处理好后点「重试」。${queued}`;
+}
+
+/* reminders (Telegram sends them when it is set up) */
+const reminderListeners = [];
+export const onReminder = fn => reminderListeners.push(fn);
+export const remind = r => fire(reminderListeners, r);
 
 export const logRows = (days = 30) => db.prepare('SELECT * FROM posts WHERE at>=? ORDER BY at DESC').all(Date.now() - days * 86400e3);

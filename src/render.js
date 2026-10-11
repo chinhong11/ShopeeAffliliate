@@ -178,17 +178,19 @@ async function renderNow(state, { set = false } = {}) {
     const bad = placeholderProblems(live, state);
     if (bad.length) throw new Error('placeholder guard: ' + bad.join(', '));
     await trimFonts(page, state);
+    await page.evaluate(() => window.PostStudio.fit && window.PostStudio.fit()); // headline / price sizes with the final fonts
     const pngUrl = await page.evaluate(() => window.PostStudio.exportPng());
     const png = toBuf(pngUrl);
-    /* 540px JPEG for the review app's cards */
-    const thumb = toBuf(await page.evaluate(async u => {
+    /* JPEGs for the review app: 540px for the cards, 1080px for the edit page (a fraction of the PNG's size on a phone) */
+    const jpeg = size => page.evaluate(async ([u, s]) => {
       const i = new Image(); await new Promise((r, j) => { i.onload = r; i.onerror = j; i.src = u; });
-      const c = document.createElement('canvas'); c.width = c.height = 540; c.getContext('2d').drawImage(i, 0, 0, 540, 540);
+      const c = document.createElement('canvas'); c.width = c.height = s; c.getContext('2d').drawImage(i, 0, 0, s, s);
       return c.toDataURL('image/jpeg', 0.85);
-    }, pngUrl));
+    }, [pngUrl, size]).then(toBuf);
+    const thumb = await jpeg(540), view = await jpeg(1080);
     const pages = set ? (await page.evaluate(() => window.PostStudio.exportSet())).map(toBuf) : null;
     const caption = await page.evaluate(() => window.PostStudio.caption());
-    return { png, thumb, set: pages, caption };
+    return { png, thumb, view, set: pages, caption };
   })();
   work.catch(() => {});
   try {
@@ -216,6 +218,7 @@ export function photoDataUrl(ref) {
 
 function writeAtomic(file, buf) { const tmp = file + '.tmp'; fs.writeFileSync(tmp, buf); fs.renameSync(tmp, file); }
 export const thumbFile = id => path.join(dirs.out, `${id}.jpg`);
+export const viewFile = id => path.join(dirs.out, `${id}-v.jpg`);
 export const posterFile = (id, n = 0) => path.join(dirs.out, n ? `${id}-${n}.png` : `${id}.png`);
 
 /* render a draft → $DATA_DIR/out/{draftId}.png (t8: also {draftId}-1..4.png).
@@ -229,6 +232,7 @@ export const renderDraft = id => exclusive(async () => {
     const r = await renderNow(st, { set: d.form.tpl === 't8' });
     writeAtomic(posterFile(id), r.set ? r.set[0] : r.png);
     writeAtomic(thumbFile(id), r.thumb);
+    writeAtomic(viewFile(id), r.view);
     if (r.set) r.set.forEach((b, i) => writeAtomic(posterFile(id, i + 1), b));
     drafts.update(id, { posterKey: posterKey(d, cfg), posterError: null });
     return { file: posterFile(id), files: r.set ? r.set.map((_, i) => posterFile(id, i + 1)) : [posterFile(id)], caption: r.caption };

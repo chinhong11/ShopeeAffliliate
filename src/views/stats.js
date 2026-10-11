@@ -13,7 +13,7 @@ export function statsView({ brand, range, s, count }) {
   };
   const body = `
     <header class="rv-head">
-      <div class="grow"><h1>数据</h1><div class="hsub">${s.hasReport ? `Shopee 转化报告 · 上次 ${esc(s.reportAt)}` : '订单和佣金要等 Shopee 转化报告（Step 9）接上；现在只统计帖子数'}</div></div>
+      <div class="grow"><h1>数据</h1><div class="hsub">${s.hasReport ? `Shopee 转化报告 · 上次 ${esc(s.reportAt)}` : '订单和佣金还没接上 Shopee 的成交报告，现在只统计发了几帖'}</div></div>
       <form class="seg seg-mini" action="/stats" method="get">${[['7', '7 天'], ['30', '30 天']].map(([k, l]) => `<button type="submit" name="r" value="${k}" aria-pressed="${range === k}">${l}</button>`).join('')}</form>
     </header>
     <div class="rv-scroll" id="scroll">

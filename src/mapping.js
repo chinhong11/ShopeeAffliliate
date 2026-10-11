@@ -145,6 +145,11 @@ export function placeholderProblems(live, patch) {
   return bad;
 }
 
-/* poster cache key: the studio state the poster is rendered from (countdown time excluded: fixed clock) */
+/* poster cache key: the studio state the poster is rendered from (countdown time excluded: fixed clock).
+   The caption builder's fields (cap) don't change the picture, so a new short link or caption doesn't
+   re-render it, except on 好友爆料 (t4), whose chat bubble shows the link. */
 export function hash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + '_' + s.length; }
-export const posterKey = (d, cfg) => hash(JSON.stringify(studioState({ ...d, now: 0 }, cfg)));
+export const posterKey = (d, cfg) => {
+  const { cap, ...st } = studioState({ ...d, now: 0 }, cfg);
+  return hash(JSON.stringify(st.tpl === 't4' ? { ...st, link: cap.link } : st));
+};

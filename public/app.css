@@ -25,3 +25,34 @@ body{background:var(--bg);-webkit-tap-highlight-color:transparent}
 /* review-app.css's generic .empty (empty-queue box) also matches .slot.empty; keep slots compact */
 .slot.empty{margin:0;padding:11px 12px 12px;display:block;text-align:left}
 .hsub.err{color:var(--dealt)}
+/* readability: secondary text at least 12px and at least 4.5:1 contrast (WCAG AA) on every panel colour */
+.rv{--muted-2:#968da6}
+.rv .lbl,.rv .field > label,.rv .toggle-row > label .soft,.rv .slot .st span,.rv .tp span,.rv .sec-h .tip,.rv .hint,
+.rv .lg .st,.rv .l1 .mt,.rv .kpi span,.rv .chip,.rv .hooks button .k{font-size:12px}
+.rv .lt code{font-size:12px}
+.rv .ph .tag{font-size:11px}
+.rv .chip.disc,.rv .alert .btn{background:#d90f38}
+.rv .chip.com{background:#15803d}
+/* tap targets at least 44px */
+.rv .hooks button{min-height:44px}
+.rv .toast button{min-height:44px;min-width:44px}
+.rv .toggle-row > label{cursor:pointer;flex:1;min-height:44px;display:flex;flex-direction:column;justify-content:center}
+.rv .toast{cursor:pointer}
+/* edit page: autosave note next to the title */
+.ed-top .tt .sv{margin-left:6px;font-size:12px;font-weight:700;color:var(--okt)}
+/* pause banner: Facebook's own words apart, link to the guide section */
+.alert .fbw{color:#f7b3c0;font-weight:600;word-break:break-word}
+.alert .help{display:inline-flex;align-items:center;min-height:44px;margin-top:2px;color:#fff;font-size:13px;font-weight:800;text-decoration:underline;text-underline-offset:3px}
+/* last day before a draft expires */
+.card .exp{margin-bottom:9px;font-size:12.5px;font-weight:800;color:var(--warnt)}
+/* 已跳过 (collapsed) */
+.skp summary{cursor:pointer;list-style:none;min-height:44px}
+.skp summary::-webkit-details-marker{display:none}
+.skp summary::before{content:'▸';font-size:12px;margin-right:2px}
+.skp[open] summary::before{content:'▾'}
+.skp summary .soft{font-weight:700;letter-spacing:0;text-transform:none;color:var(--muted-2)}
+.skp .qt{cursor:default}
+.qt span.dim{color:var(--muted)}
+/* slot card: on a narrow phone the planned minute moves under the time as a whole, never split mid-text */
+.rv .slot .st{flex-wrap:wrap;row-gap:3px}
+.rv .slot .st span{white-space:nowrap}
