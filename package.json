@@ -11,6 +11,7 @@
     "collect": "node src/collect.js",
     "publish-due": "node src/publish.js",
     "render-test": "node scripts/render-test.js",
+    "studio-test": "node scripts/studio-test.js",
     "backup": "node src/backup.js",
     "test": "node --test test/*.test.js"
   },

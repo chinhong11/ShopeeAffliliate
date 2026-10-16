@@ -67,11 +67,12 @@ const [info, saveBtn, backBtn] = bar.children, [title, msg] = info.children;
 /* kind: '' a hint, 'ok' saved, 'err' a problem; the whole text shows on hover when it's cut to two lines */
 const say = (t, kind = '') => { msg.textContent = msg.title = t; msg.className = 'rvb-m' + (kind ? ' ' + kind : ''); };
 
-let loaded = null, saved = null; // the state as it came from the app / as last saved
+let loaded = null, saved = null, photoRefs = []; // the state as it came from the app / as last saved; the draft's photos then
 async function boot() {
   for (let i = 0; i < 200 && !window.PostStudio; i++) await new Promise(r => setTimeout(r, 50));
   if (!window.PostStudio) throw new Error('Studio 没加载出来，刷新一下');
-  const st = await api(`/drafts/${id}/studio-state`);
+  const { photoRefs: refs, ...st } = await api(`/drafts/${id}/studio-state`);
+  photoRefs = refs;
   await window.PostStudio.load(st, { persist: true });
   loaded = saved = window.PostStudio.getState();
   const name = (st.cap && st.cap.name) || id;
@@ -87,7 +88,7 @@ saveBtn.onclick = async () => {
   if (!Object.keys(ch).length) { say('没有改动'); return; }
   saveBtn.disabled = true; say('保存中…正在按这里的样子生成海报');
   try {
-    const r = await api(`/drafts/${id}/studio`, { changes: ch });
+    const r = await api(`/drafts/${id}/studio`, { changes: { ...ch, photos: photoRefs } });
     saved = now;
     try { new BroadcastChannel('rv').postMessage({ type: 'studio-saved', id }); } catch {}
     if (r.posterError) { say(`改动已保存，但海报没生成出来（${r.posterError}）。回到 App 点「↻ 重新生成海报」再试`, 'err'); saveBtn.disabled = false; return; }
@@ -95,6 +96,7 @@ saveBtn.onclick = async () => {
     /* the discount seal and the rating show only where the product has them: turned on here, they stay off */
     if (!kept.includes('价格和数据') && ['seal', 'proof'].some(k => now[k] && !r.shown[k])) kept.unshift('价格和数据');
     const notes = kept.length ? [`${kept.join('、')}以 App 为准，没有带回去`] : [];
+    if (r.shown.framesDropped) notes.push('照片在 App 里改过了，照片位置没带回去：刷新这一页再调');
     if (r.shown.tpl !== now.tpl) notes.push('模板没换成这个：要先在 App 里补上它需要的内容'); // locked until it has its real data
     say(['已保存 ✓ App 里的海报已经更新', ...notes].join('。'), 'ok');
   } catch (e) { say('没保存成功：' + e.message, 'err'); }

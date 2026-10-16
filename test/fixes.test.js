@@ -191,6 +191,11 @@ test('在 Studio 精修 → 保存到草稿: what changed in the studio is kept,
   const d2 = drafts.get(id);
   assert.equal(d2.form.l1, 'Studio 改的标题'); assert.ok(!('c2' in d2.form.look)); assert.equal(d2.form.look.c1, '#1e90ff');
   assert.ok(d2.form.look.at > lk.at, 'each studio save is newer than the one before (same millisecond too)');
+  /* a dragged position keeps its decimals; framing for a photo list the app has changed since is dropped */
+  svc.saveStudio(id, { photos: [p0, p1], frames: [{ zoom: 120, x: 37.4, y: 50 }] });
+  assert.equal(drafts.get(id).form.look.frames[p0].x, 37.4);
+  assert.ok(svc.saveStudio(id, { photos: [p1], frames: [{ zoom: 200, x: 10, y: 10 }] }).framesDropped);
+  assert.equal(drafts.get(id).form.look.frames[p0].zoom, 120);
   /* an edit page opened before that studio save doesn't write its older look over it */
   svc.saveForm(id, { l2: '编辑页改的', look: { ...d2.form.look, c1: '#000000', at: d2.form.look.at - 1 } });
   assert.equal(drafts.get(id).form.look.c1, '#1e90ff'); assert.equal(drafts.get(id).form.l2, '编辑页改的');

@@ -192,13 +192,13 @@ api.post('/drafts/:id/studio', wrap(async req => {
   const d = svc.saveStudio(req.params.id, req.body && req.body.changes);
   await svc.ensurePoster(d.id);
   const n = drafts.get(d.id), st = studioState(n, loadConfig());
-  return { posterKey: n.posterKey, posterError: n.posterError, lookAt: (n.form.look && n.form.look.at) || 0, shown: { seal: st.seal, proof: st.proof, tpl: n.form.tpl } };
+  return { posterKey: n.posterKey, posterError: n.posterError, shown: { seal: st.seal, proof: st.proof, tpl: n.form.tpl, framesDropped: d.framesDropped } };
 }));
 api.post('/drafts/:id/photo', wrap(req => { const ref = svc.savePhoto(req.params.id, req.body.dataUrl); return { ref, url: '/img/' + ref.slice(3) }; }));
 api.get('/drafts/:id/studio-state', wrap(req => {
   const d = drafts.get(req.params.id);
   if (!d) throw new Error('草稿不存在');
-  return studioState(d, loadConfig(), ref => '/img/' + encodeURIComponent(ref.replace(/^\w+:/, '')));
+  return { ...studioState(d, loadConfig(), ref => '/img/' + encodeURIComponent(ref.replace(/^\w+:/, ''))), photoRefs: d.form.photos };
 }));
 /* 重试 on the Token banner: debug_token must pass before publishing resumes */
 api.post('/token', wrap(async () => {

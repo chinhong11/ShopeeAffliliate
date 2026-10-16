@@ -93,9 +93,10 @@ const str = (v, n) => String(v ?? '').slice(0, n);
    own studio state (mapping.studioState). Only these fields, only valid values; prices, rating, sold, photos and
    the brand badge stay the app's. */
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-export const STUDIO_FONTS = ['"Noto Sans SC","Nunito"', '"Baloo 2","Noto Sans SC"', '"Ma Shan Zheng","Noto Sans SC"', '"Montserrat","Noto Sans SC"', '"Anton","Noto Sans SC"'];
-const int = (v, lo, hi) => v === '' || v == null || typeof v === 'boolean' || !Number.isFinite(+v) ? undefined : Math.min(hi, Math.max(lo, Math.round(+v)));
-export function cleanLook(lk, photos = []) {
+const STUDIO_FONTS = ['"Noto Sans SC","Nunito"', '"Baloo 2","Noto Sans SC"', '"Ma Shan Zheng","Noto Sans SC"', '"Montserrat","Noto Sans SC"', '"Anton","Noto Sans SC"'];
+const num = (v, lo, hi) => v === '' || v == null || typeof v === 'boolean' || !Number.isFinite(+v) ? undefined : Math.min(hi, Math.max(lo, +v));
+const int = (v, lo, hi) => { const n = num(v, lo, hi); return n === undefined ? n : Math.round(n); };
+function cleanLook(lk, photos = []) {
   if (!lk || typeof lk !== 'object') return undefined;
   const o = {};
   for (const k of ['c1', 'c2', 'ol', 'hlc', 'bg']) if (typeof lk[k] === 'string' && HEX.test(lk[k])) o[k] = lk[k];
@@ -111,7 +112,7 @@ export function cleanLook(lk, photos = []) {
     const out = {};
     for (const [ref, q] of Object.entries(m && typeof m === 'object' ? m : {})) {
       if (!photos.includes(ref) || !q || typeof q !== 'object') continue; // a photo that's gone takes its framing with it
-      const zoom = int(q.zoom, 100, 280), x = int(q.x, 0, 100), y = int(q.y, 0, 100);
+      const zoom = int(q.zoom, 100, 280), x = num(q.x, 0, 100), y = num(q.y, 0, 100); // a dragged photo sits at e.g. 37.4 %
       if (zoom !== undefined && x !== undefined && y !== undefined) out[ref] = { zoom, x, y };
     }
     return Object.keys(out).length ? out : undefined;
@@ -179,7 +180,9 @@ export function saveStudio(id, ch) {
   if (ch.review && typeof ch.review === 'object') f.review = { ...fm.review, ...ch.review };
   if (ch.chat && typeof ch.chat === 'object') f.chat = { ...fm.chat, ...ch.chat };
   for (const k of LOOK_KEYS) if (own(ch, k)) look[k] = ch[k];
-  if (Array.isArray(ch.frames)) {
+  /* framing goes by photo position: if the photos changed in the app since the studio opened, it would land on the wrong one */
+  const framed = !Array.isArray(ch.photos) || JSON.stringify(ch.photos) === JSON.stringify(fm.photos);
+  if (framed && Array.isArray(ch.frames)) {
     look.frames = { ...(look.frames || {}) };
     ch.frames.forEach((q, i) => { if (q && fm.photos[i]) look.frames[fm.photos[i]] = q; });
   }
@@ -188,13 +191,13 @@ export function saveStudio(id, ch) {
     look.pageCaps = look.pageCaps ? [...look.pageCaps] : [...T8_CAPS];
     ch.pages.forEach((q, i) => {
       if (!q) return;
-      if (q.zoom !== undefined && fm.photos[i]) look.pageFrames[fm.photos[i]] = { zoom: q.zoom, x: q.x, y: q.y };
+      if (framed && q.zoom !== undefined && fm.photos[i]) look.pageFrames[fm.photos[i]] = { zoom: q.zoom, x: q.x, y: q.y };
       if (typeof q.cap === 'string') look.pageCaps[i] = q.cap;
     });
   }
   look.at = Math.max(Date.now(), ((fm.look && +fm.look.at) || 0) + 1); // always newer than the last one, even if the clock steps back
   f.look = look;
-  return saveForm(id, f);
+  return Object.assign(saveForm(id, f), { framesDropped: !framed && !!(ch.frames || ch.pages) });
 }
 
 /* sub IDs carry the template: when it changed, get a fresh short link and swap it into the captions */
