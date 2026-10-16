@@ -33,6 +33,7 @@ body{background:var(--bg);-webkit-tap-highlight-color:transparent}
 .rv .ph .tag{font-size:11px}
 .rv .chip.disc,.rv .alert .btn{background:#d90f38}
 .rv .chip.com{background:#15803d}
+.rv .chip.man{background:#4f46e5;color:#fff}
 /* tap targets at least 44px */
 .rv .hooks button{min-height:44px}
 .rv .toast button{min-height:44px;min-width:44px}

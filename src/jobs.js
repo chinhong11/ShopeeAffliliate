@@ -10,6 +10,7 @@ import { publishDue, recoverInterrupted } from './publish.js';
 import { checkToken } from './facebook.js';
 import { runCollect, pause, pauseText, fbWords, EXPIRE_MS, approvedWithSlots, remind } from './service.js';
 import { backup } from './backup.js';
+import { ready as shopeeReady } from './shopee.js';
 
 const log = (...a) => console.log(new Date().toISOString(), '[jobs]', ...a);
 const jobs = [];
@@ -117,7 +118,7 @@ const DAILY = [
   { name: 'daily', at: () => '00:05', run: () => { daily(); return true; } },
   { name: 'backup', at: () => '03:30', run: async () => { await backup({ log }); return true; } },
   { name: 'token', at: cfg => hhmm((toMin(cfg.collectAt) + 1430) % 1440), run: async () => !(await tokenCheck()).transient }, // 10 min before collect
-  { name: 'collect', at: cfg => cfg.collectAt, run: () => { log('collect'); runCollect(); return true; } }
+  { name: 'collect', at: cfg => cfg.collectAt, run: () => { if (!shopeeReady()) { log('collect skipped: no Shopee API keys (products are added by hand)'); return true; } log('collect'); runCollect(); return true; } }
 ];
 let dailyBusy = false;
 export async function runDailyDue(now = Date.now()) {

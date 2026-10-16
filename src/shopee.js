@@ -11,6 +11,9 @@ export const SORT = { RELEVANCE: 1, SALES_DESC: 2, PRICE_DESC: 3, PRICE_ASC: 4, 
 
 const NODE_FIELDS = 'itemId shopId productName imageUrl priceMin priceMax priceDiscountRate ratingStar sales commissionRate productLink offerLink shopName';
 
+/* keys set (or the offline mock): without them the app runs on products added by hand (＋ 手动添加) */
+export const ready = () => env.SHOPEE_MOCK || !!(env.SHOPEE_APP_ID && env.SHOPEE_APP_SECRET);
+
 export class ShopeeError extends Error {
   constructor(msg, extra = {}) { super(msg); Object.assign(this, extra); }
 }

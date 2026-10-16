@@ -71,21 +71,23 @@ const pauseBanner = p => `<div class="alert"><div class="at"><b>发布已暂停<
   <a class="help" href="${GUIDE}#${p.code === 190 ? 'if-the-facebook-token-stops-working' : 'if-posting-is-paused-for-another-reason'}" target="_blank" rel="noopener">${p.code === 190 ? '怎么重新生成 token' : '怎么处理'} ↗</a></div><button class="btn btn-sm" data-act="token">重试</button></div>`;
 
 /* empty queue: "all done" only when today's collect has run; the time follows config.collectAt */
-function emptyBox(lastCollect, collecting, collectAt = '08:00', now = Date.now()) {
+const ADD = '<a class="btn btn-ghost btn-sm" href="/new">＋ 手动添加</a>';
+function emptyBox(lastCollect, collecting, collectAt = '08:00', now = Date.now(), hasApi = true) {
+  if (!hasApi) return `<div class="empty"><b>还没有草稿</b><p>还没设置 Shopee API：从 Shopee 下载商品图，手动加进来。</p>${ADD}</div>`;
   const t = new Date(now), next = (t.getHours() * 60 + t.getMinutes() < toMin(collectAt) ? '今天 ' : '明天 ') + collectAt;
   const done = lastCollect && dayStr(lastCollect.at) === dayStr(now);
   const [h, p] = collecting ? ['正在抓新品…', '抓到的草稿会出现在这里。'] : done ? ['今天的都处理完了', `${next} 自动抓新品，也可以现在再抓一次。`] : ['还没有新草稿', `${next} 自动抓新品，也可以现在抓一次。`];
-  return `<div class="empty"><b>${h}</b><p>${p}</p><button class="btn btn-ghost btn-sm" data-act="collect"${collecting ? ' disabled' : ''}>↻ 现在抓取</button></div>`;
+  return `<div class="empty"><b>${h}</b><p>${p}</p><button class="btn btn-ghost btn-sm" data-act="collect"${collecting ? ' disabled' : ''}>↻ 现在抓取</button>${ADD}</div>`;
 }
 
-export function queueView({ brand, pending, approved, today, paused, collecting, lastCollect, collectError, posterState, posted, skipped = [], hasThumb = () => false, collectAt, expireMs = 0 }) {
+export function queueView({ brand, pending, approved, today, paused, collecting, lastCollect, collectError, posterState, posted, skipped = [], hasThumb = () => false, collectAt, expireMs = 0, hasApi = true }) {
   const now = Date.now();
   const failed = !collecting && collectError && (!lastCollect || collectError.at > lastCollect.at);
   const sub = collecting || (failed
     ? `${zhDate(collectError.at)} · ${fmtTime(collectError.at)} 抓取失败：${collectError.error}`
     : lastCollect
       ? `${zhDate(lastCollect.at)} · ${fmtTime(lastCollect.at)} 抓了 ${lastCollect.created} 个新品`
-      : `${zhDate(Date.now())} · 还没抓取`);
+      : hasApi ? `${zhDate(Date.now())} · 还没抓取` : `${zhDate(Date.now())} · 手动模式（还没设置 Shopee API）`);
   const todayEntries = approved.filter(x => x.slot && x.slot.k === 0);
   const body = `
     <header class="rv-head">
@@ -93,14 +95,15 @@ export function queueView({ brand, pending, approved, today, paused, collecting,
         <h1>待审核${pending.length ? `<span class="cnt">${pending.length}</span>` : ''}</h1>
         <div class="hsub${collecting ? ' busy' : failed ? ' err' : ''}" id="hsub">${esc(sub)}</div>
       </div>
-      <button class="btn btn-ghost btn-sm" data-act="collect"${collecting ? ' disabled' : ''}>↻ 抓取</button>
+      ${ADD}
+      ${hasApi ? `<button class="btn btn-ghost btn-sm" data-act="collect"${collecting ? ' disabled' : ''}>↻ 抓取</button>` : ''}
     </header>
     <div class="rv-scroll" id="scroll">
       ${paused ? pauseBanner(paused) : ''}
       <div class="slots">${today.map(s => slotCard(s, todayEntries.find(x => x.slot.label === s.label), paused, posted[s.draftId])).join('')}</div>
       ${pending.length
         ? `<div class="list">${pending.map(d => card(d, posterState(d), expireMs, now)).join('')}</div>`
-        : emptyBox(lastCollect, collecting, collectAt, now)}
+        : emptyBox(lastCollect, collecting, collectAt, now, hasApi)}
       ${approved.length ? `<div class="lbl">已批准 · 排队中 · ${approved.length}</div>
       <div class="qlist">${approved.map(({ d, slot }) => `<div class="qrow">
         <img src="${posterState(d).hasPoster ? `/posters/${d.id}.jpg?k=${encodeURIComponent(d.posterKey)}` : `/img/${encodeURIComponent(d.p.img)}`}" alt="">
