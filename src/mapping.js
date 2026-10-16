@@ -1,7 +1,7 @@
 /* Shopee offer → product → studio state (README Step 1 mapping).
    Plain ESM with no Node imports: also served to the review app at /shared/mapping.js. */
 
-export const STRATS = { top: { zh: '爆卖', key: 'topSellers' }, com: { zh: '高佣', key: 'highestCommission' }, disc: { zh: '大折扣', key: 'biggestDiscount' } };
+export const STRATS = { top: { zh: '爆卖', key: 'topSellers' }, com: { zh: '高佣', key: 'highestCommission' }, disc: { zh: '大折扣', key: 'biggestDiscount' }, man: { zh: '手动', key: 'manual' } };
 export const STRAT_CODE = { topSellers: 'top', highestCommission: 'com', biggestDiscount: 'disc' };
 export const TPL = { t1: '爆款分享', t2: '价格暴击', t3: '限时抢购', t4: '好友爆料', t5: '真实好评', t6: '杂志封面', t8: '轮播套图' };
 export const TPL_NOTE = { t1: '照片为主', t2: '大字价格', t6: '杂志风', t5: '买家原话', t3: '倒计时', t4: '聊天截图风', t8: '4 张一组' };
@@ -42,7 +42,7 @@ export const hasRating = p => num(p.rating) !== null && p.rating > 0;
 export const wasOf = p => !hasDisc(p) ? '' : rm(num(p.originalPrice) || p.price / (1 - p.disc / 100));
 export const pctOf = p => hasDisc(p) ? '-' + Math.round(p.disc) + '%' : '';
 export const rateOf = p => hasRating(p) ? Number(p.rating).toFixed(1) : '';
-export const commOf = p => '佣金 ' + +(p.comm * 100).toFixed(1) + '% ≈ ' + rm(p.price * p.comm) + '/单';
+export const commOf = p => p.manual ? '手动添加 · 你自己的推广链接' : '佣金 ' + +(p.comm * 100).toFixed(1) + '% ≈ ' + rm(p.price * p.comm) + '/单';
 
 /* productOfferV2 node → product (numbers parsed; the API returns several as strings) */
 export function productFromOffer(n) {

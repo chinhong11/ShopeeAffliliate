@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jobs-'));
-Object.assign(process.env, { DATA_DIR: tmp, TZ: 'Asia/Kuala_Lumpur', CONFIG_FILE: path.join(tmp, 'none.json'), FB_PAGE_TOKEN: '', FB_APP_ID: '', FB_APP_SECRET: '' });
+Object.assign(process.env, { DATA_DIR: tmp, TZ: 'Asia/Kuala_Lumpur', CONFIG_FILE: path.join(tmp, 'none.json'), FB_PAGE_TOKEN: '', FB_APP_ID: '', FB_APP_SECRET: '', SHOPEE_MOCK: '1' }); // the collect job runs only with Shopee keys or the mock
 const { db, kv, dayStr } = await import('../src/db.js');
 const { planDay, upcoming, slotLabels } = await import('../src/slots.js');
 const { loadConfig, dirs } = await import('../src/config.js');
@@ -96,7 +96,7 @@ test('token check: a check that could not be made never pauses; a real problem p
   assert.equal(svc.pause.get().code, 368); // a posting pause waits for 重试
   svc.pause.clear();
   fb.opts.fetchImpl = real;
-  Object.assign(env, { FB_PAGE_TOKEN: '', FB_APP_ID: '', FB_APP_SECRET: '' });
+  Object.assign(env, { FB_PAGE_TOKEN: '', FB_APP_ID: '', FB_APP_SECRET: '', SHOPEE_MOCK: '1' }); // the collect job runs only with Shopee keys or the mock
 });
 
 test('daily jobs catch up once per day, and only on the lease holder', async () => {

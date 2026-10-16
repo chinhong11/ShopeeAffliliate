@@ -32,6 +32,7 @@ const movedMoreThan3 = (a, b) => { const c0 = Math.round(a * 100), c1 = Math.rou
 /* right before posting: re-fetch the product. >3% price move or gone → back to 待审核, no post.
    A smaller move updates the poster, headline and captions so they never show a stale price. */
 export async function priceCheck(d, { dryRun = false } = {}) {
+  if (d.p.manual) return { ok: true }; // added by hand: no API to re-check against
   const node = await shopee.product(d.shopId, d.itemId);
   if (!node) return { ok: false, gone: true, message: '商品下架了或不在联盟计划里，这次没有发。' };
   const n = productFromOffer(node), o = d.p;
@@ -118,7 +119,7 @@ export async function publishDraft(id, { slotId = null, dryRun = false, manual =
       refreshCaptions(view, cfg);
       pl = payload(view, cfg);
       console.log('[dry-run] no API calls. Facebook payload:\n' + JSON.stringify({ ...pl, posterFresh: posterFresh(d, cfg), priceCheck: pc,
-        ...(d.subIds[1] !== d.form.tpl ? { note: `sub IDs still carry ${d.subIds[1]}; a real post first gets a short link for ${d.form.tpl}` } : {}) }, null, 2));
+        ...(!d.p.manual && d.subIds[1] !== d.form.tpl ? { note: `sub IDs still carry ${d.subIds[1]}; a real post first gets a short link for ${d.form.tpl}` } : {}) }, null, 2));
       return { kind: 'dry-run', payload: pl };
     }
     d = await syncShortLink(d); // the link's sub IDs must name the template that is posted

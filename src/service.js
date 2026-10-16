@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { loadConfig, dirs } from './config.js';
-import { drafts, kv, ymd, db } from './db.js';
+import { drafts, kv, ymd, db, dayStr, newDraftId } from './db.js';
+import { newForm, withCaptions } from './draft.js';
 import * as shopee from './shopee.js';
 import { posterKey, TPL, endAtFrom, T8_CAPS } from './mapping.js';
 import { refreshCaptions, availability, isPersonal, suggest } from './pick.js';
@@ -202,7 +203,7 @@ export function saveStudio(id, ch) {
 
 /* sub IDs carry the template: when it changed, get a fresh short link and swap it into the captions */
 export async function syncShortLink(d) {
-  if (d.subIds[1] === d.form.tpl) return d;
+  if (d.p.manual || d.subIds[1] === d.form.tpl) return d; // a hand-added product keeps the link that was pasted
   const subIds = shopee.cleanSubIds(['fb', d.form.tpl, d.strat, d.subIds[3] || ymd(), d.id]);
   const link = await shopee.shortLink(d.p.productLink || d.p.offerLink, subIds);
   const f = d.form, old = d.shortLink;
@@ -252,13 +253,53 @@ export function savePhoto(id, dataUrl) {
   if (!/^d[0-9a-f]{8}$/.test(String(id))) throw new Error('草稿不存在');
   const d = drafts.get(id);
   if (!d || !['draft', 'approved'].includes(d.status)) throw new Error('草稿不存在');
+  return 'up:' + writePhoto(`up-${id}-${crypto.randomBytes(3).toString('hex')}`, dataUrl);
+}
+function writePhoto(base, dataUrl) {
   const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ''));
   if (!m) throw new Error('照片格式不对');
   const buf = Buffer.from(m[2], 'base64');
   if (buf.length > 4e6) throw new Error('照片太大');
-  const name = `up-${id}-${crypto.randomBytes(3).toString('hex')}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
+  const name = `${base}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
   fs.writeFileSync(path.join(dirs.img, name), buf);
-  return 'up:' + name;
+  return name;
+}
+
+/* ＋ 手动添加 (no Shopee API yet): product details, photos and the affiliate link typed in by hand → a draft.
+   It never calls the API: no short link (the pasted link is posted as it is), no price re-check before posting. */
+const SHOPEE_HOST = /(^|\.)(shopee\.com\.my|shope\.ee)$/;
+export function addManual(b) {
+  b = b && typeof b === 'object' ? b : {};
+  const name = String(b.name || '').trim().slice(0, 200);
+  if (!name) throw new Error('请填商品名称');
+  const n = v => (v === '' || v == null) ? null : Number(v);
+  const price = n(b.price), was = n(b.was), rating = n(b.rating), sales = n(b.sales);
+  if (!(price > 0 && price < 1e5)) throw new Error('现价要填大于 0 的数字');
+  if (was !== null && !(was > price && was < 1e5)) throw new Error('原价要比现价高（没有折扣就留空）');
+  if (rating !== null && !(rating > 0 && rating <= 5)) throw new Error('评分要在 0–5 之间（没有就留空）');
+  if (!(Number.isInteger(sales) && sales >= 0)) throw new Error('已售要填整数（例如 1200）');
+  let url;
+  try { url = new URL(String(b.link || '').trim()); } catch { throw new Error('推广链接不对：从 Shopee Affiliate 复制完整链接'); }
+  if (url.protocol !== 'https:' || !SHOPEE_HOST.test(url.hostname)) throw new Error('推广链接要是 Shopee 的链接（https://s.shopee.com.my/… 或 https://shope.ee/…）');
+  const photos = Array.isArray(b.photos) ? b.photos.slice(0, 4) : [];
+  if (!photos.length) throw new Error('至少加 1 张商品照片');
+
+  const cfg = loadConfig(), id = newDraftId();
+  const ids = /-i\.(\d+)\.(\d+)|\/product\/(\d+)\/(\d+)/.exec(url.pathname) || []; // a full product link names its shop and item
+  const files = photos.map((p, i) => writePhoto(i ? `up-${id}-${i}` : `m-${id}`, p));
+  const p = {
+    itemId: ids[2] || ids[4] || 'm' + id, shopId: ids[1] || ids[3] || '', name, shopName: '', imageUrl: '',
+    price, priceMax: price, originalPrice: was, disc: was ? Math.round((1 - price / was) * 100) : 0,
+    rating, sales, comm: null, productLink: url.href, offerLink: '', manual: true, img: files[0]
+  };
+  const pickState = kv.get('pickState', { prev: null, rot: {} });
+  const form = newForm({ p }, cfg, pickState);
+  form.photos = ['img:' + files[0], ...files.slice(1).map(f => 'up:' + f)];
+  const d = withCaptions({ id, itemId: p.itemId, shopId: p.shopId, strat: 'man', p, form, shortLink: url.href, subIds: [], collectedDay: dayStr() }, cfg);
+  drafts.insert(d);
+  kv.set('pickState', pickState);
+  queuePosters([id]);
+  return d;
 }
 
 /* posting pause (Facebook token / rate-limit problems). source 'token' pauses are lifted by a passing token check.

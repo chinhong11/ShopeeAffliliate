@@ -19,6 +19,8 @@ import { queueView } from './views/queue.js';
 import { editView } from './views/edit.js';
 import { logView } from './views/log.js';
 import { statsView } from './views/stats.js';
+import { newView } from './views/new.js';
+import { ready as shopeeReady } from './shopee.js';
 
 export const app = express();
 /* req.ip (login limit) may only come from X-Forwarded-For when a proxy we trust sets it: on by default on
@@ -32,7 +34,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const brand = () => (loadConfig().brand.bName || 'LEE');
+const brand = () => (loadConfig().brand.bName || 'LIM');
 const sendFile = (res, f, type) => fs.existsSync(f) ? res.type(type || path.extname(f)).sendFile(f) : res.status(404).end();
 
 /* ---------- public ---------- */
@@ -112,9 +114,11 @@ app.get('/', (req, res) => {
     collectError: kv.get('lastCollectError'), posterState: d => posterState(d, cfg), posted,
     /* skipped drafts that can still be approved (3 days), newest first: 恢复 brings one back */
     skipped: drafts.list('skipped').filter(d => d.pendingSince > Date.now() - svc.EXPIRE_MS).sort((a, b) => b.updatedAt - a.updatedAt),
-    hasThumb: d => fs.existsSync(thumbFile(d.id)), collectAt: cfg.collectAt, expireMs: svc.EXPIRE_MS
+    hasThumb: d => fs.existsSync(thumbFile(d.id)), collectAt: cfg.collectAt, expireMs: svc.EXPIRE_MS, hasApi: shopeeReady()
   }));
 });
+
+app.get('/new', (req, res) => res.send(newView({ brand: brand(), count: pendingCount() })));
 
 app.get('/d/:id', (req, res) => {
   const d = drafts.get(req.params.id);
@@ -166,6 +170,7 @@ api.get('/status', wrap(() => ({
   rendering: [...svc.status.rendering, ...svc.status.queued], paused: svc.pause.get()
 })));
 api.post('/collect', wrap(() => ({ started: svc.runCollect() })));
+api.post('/manual', wrap(req => ({ id: svc.addManual(req.body).id })));
 api.post('/drafts/:id/approve', wrap(async req => {
   const r = await svc.approve(req.params.id, req.body && req.body.form);
   return { again: r.again, slot: r.slot ? r.slot.text : null };
