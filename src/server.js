@@ -111,7 +111,7 @@ app.get('/', (req, res) => {
   res.send(queueView({
     brand: brand(), pending: drafts.list('draft'), approved: svc.approvedWithSlots(cfg), today: todayView(cfg),
     paused: svc.pause.get(), collecting: svc.status.collecting, lastCollect: lc && lc.at > Date.now() - 36 * 3600e3 ? lc : null,
-    collectError: kv.get('lastCollectError'), posterState: d => posterState(d, cfg), posted,
+    collectError: shopeeReady() ? kv.get('lastCollectError') : null, tokenCheck: kv.get('tokenCheck'), posterState: d => posterState(d, cfg), posted,
     /* skipped drafts that can still be approved (3 days), newest first: 恢复 brings one back */
     skipped: drafts.list('skipped').filter(d => d.pendingSince > Date.now() - svc.EXPIRE_MS).sort((a, b) => b.updatedAt - a.updatedAt),
     hasThumb: d => fs.existsSync(thumbFile(d.id)), collectAt: cfg.collectAt, expireMs: svc.EXPIRE_MS, hasApi: shopeeReady()
@@ -170,8 +170,11 @@ api.get('/status', wrap(() => ({
   rendering: [...svc.status.rendering, ...svc.status.queued], paused: svc.pause.get()
 })));
 api.post('/collect', wrap(() => ({ started: svc.runCollect() })));
-api.post('/manual', wrap(req => ({ id: svc.addManual(req.body).id })));
+api.post('/manual', wrap(req => { const r = svc.addManual(req.body); return r.duplicate ? { duplicate: r.duplicate } : { id: r.id }; }));
+api.post('/drafts/:id/product', wrap(req => { svc.saveManualProduct(req.params.id, req.body); return { ok: true }; }));
 api.post('/drafts/:id/approve', wrap(async req => {
+  const question = !(req.body && req.body.priceOk) && svc.priceQuestion(drafts.get(req.params.id));
+  if (question) return { confirm: question };
   const r = await svc.approve(req.params.id, req.body && req.body.form);
   return { again: r.again, slot: r.slot ? r.slot.text : null };
 }));
@@ -208,6 +211,7 @@ api.get('/drafts/:id/studio-state', wrap(req => {
 /* 重试 on the Token banner: debug_token must pass before publishing resumes */
 api.post('/token', wrap(async () => {
   const r = await fb.checkToken();
+  kv.set('tokenCheck', { at: Date.now(), ok: r.ok, transient: !!r.transient });
   if (r.ok) { svc.pause.clear(); return { ok: true }; }
   if (r.transient) return { ok: false, error: '暂时连不上 Facebook（' + r.problems.join('；') + '），过几分钟再点重试' };
   svc.pause.set(190, svc.pauseText(190, r.problems), 'token', svc.fbWords(r.detail));

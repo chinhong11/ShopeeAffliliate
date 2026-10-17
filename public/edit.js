@@ -240,7 +240,11 @@ el('approve').onclick = async () => {
   if (posterKey(draft(), cfg) !== savedKey) setPoster('busy');
   try {
     const snap = JSON.stringify(f);
-    const r = await api(`/drafts/${d.id}/approve`, { form: JSON.parse(snap) });
+    let r = await api(`/drafts/${d.id}/approve`, { form: JSON.parse(snap) });
+    if (r.confirm) {
+      if (!confirm(r.confirm)) { busy = false; syncDirty(); setPoster('none'); if (d.p.manual) el('mp').scrollIntoView({ behavior: 'smooth' }); return; }
+      r = await api(`/drafts/${d.id}/approve`, { form: JSON.parse(snap), priceOk: true });
+    }
     savedForm = snap; // approving saved the form: nothing left for the leave-page flush
     toastNext(r.again ? '已保存修改' : '已批准 · ' + (r.slot || '等空位') + ' 发布');
     location.href = '/';
@@ -280,6 +284,31 @@ async function waitPoster() {
   if (r.posterError) setPoster('err', '海报没生成出来');
   else { if (r.posterKey) savedKey = r.posterKey; setPoster('ok'); }
   syncDirty();
+}
+
+/* 商品资料 (hand-added products only): saved on its own, then the page reloads with the new headline, captions and poster */
+if (d.p.manual) {
+  const p = d.p, val = v => v == null ? '' : esc(v);
+  $('#form').insertAdjacentHTML('afterbegin', `<section class="sec" id="mp">
+    <div class="sec-h"><span class="ic">🛍️</span><h2>商品资料</h2><span class="tip">手动添加 · 填错了在这里改</span></div>
+    <div class="field"><label for="mpName">商品名称</label><input id="mpName" type="text" maxlength="200" value="${val(p.name)}"></div>
+    <div class="field"><label for="mpPrice">现价 RM</label><input id="mpPrice" type="number" inputmode="decimal" step="0.01" min="0.01" value="${val(p.price)}"></div>
+    <div class="field"><label for="mpWas">原价 RM <span class="soft">选填 · 有折扣才填</span></label><input id="mpWas" type="number" inputmode="decimal" step="0.01" min="0.01" value="${val(p.originalPrice)}"></div>
+    <div class="field"><label for="mpRating">评分 <span class="soft">选填</span></label><input id="mpRating" type="number" inputmode="decimal" step="0.1" min="0.1" max="5" value="${val(p.rating)}"></div>
+    <div class="field"><label for="mpSales">已售</label><input id="mpSales" type="number" inputmode="numeric" step="1" min="0" value="${val(p.sales)}"></div>
+    <div class="field"><label for="mpLink">Shopee Affiliate 链接</label><input id="mpLink" type="url" inputmode="url" value="${val(p.productLink)}"></div>
+    <button class="btn btn-ghost" id="mpSave" type="button">保存商品资料</button>
+  </section>`);
+  el('mpSave').onclick = async () => {
+    const b = el('mpSave'), v = id => el(id).value.trim();
+    b.disabled = true; b.textContent = '保存中…';
+    try {
+      if (saving) await saving; if (unsaved()) await save(false); // keep the other edits first
+      await api(`/drafts/${d.id}/product`, { name: v('mpName'), price: v('mpPrice'), was: v('mpWas'), rating: v('mpRating'), sales: v('mpSales'), link: v('mpLink') });
+      toastNext('商品资料已保存 · 海报重新生成中');
+      reloadFromServer();
+    } catch (e) { b.disabled = false; b.textContent = '保存商品资料'; toast(e.message); }
+  };
 }
 
 syncUsed(); renderTps(); renderHooks(); renderPhotos(); syncCaptions(); syncDirty(); waitPoster();

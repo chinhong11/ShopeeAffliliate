@@ -70,6 +70,14 @@ function slotCard(s, entry, paused, posted) {
 const pauseBanner = p => `<div class="alert"><div class="at"><b>发布已暂停</b><p>${esc(p.message)}</p>${p.detail ? `<p class="fbw">Facebook 原话：${esc(p.detail)}</p>` : ''}
   <a class="help" href="${GUIDE}#${p.code === 190 ? 'if-the-facebook-token-stops-working' : 'if-posting-is-paused-for-another-reason'}" target="_blank" rel="noopener">${p.code === 190 ? '怎么重新生成 token' : '怎么处理'} ↗</a></div><button class="btn btn-sm" data-act="token">重试</button></div>`;
 
+/* the last Facebook token check (daily, at start, and 现在检查); a failed one shows as the pause banner instead */
+function fbStatus(tc, now) {
+  if (!tc) return '';
+  const when = (dayStr(tc.at) === dayStr(now) ? '今天 ' : zhDate(tc.at) + ' ') + fmtTime(tc.at);
+  const txt = tc.ok ? `✓ Facebook 正常 · ${when} 检查过` : tc.transient ? `⚠ ${when} 暂时连不上 Facebook，稍后会自动再查` : '';
+  return txt ? `<div class="fbst${tc.ok ? '' : ' warn'}"><span>${esc(txt)}</span><button class="btn btn-ghost btn-sm" data-act="token">现在检查</button></div>` : '';
+}
+
 /* empty queue: "all done" only when today's collect has run; the time follows config.collectAt */
 const ADD = '<a class="btn btn-ghost btn-sm" href="/new">＋ 手动添加</a>';
 function emptyBox(lastCollect, collecting, collectAt = '08:00', now = Date.now(), hasApi = true) {
@@ -80,7 +88,7 @@ function emptyBox(lastCollect, collecting, collectAt = '08:00', now = Date.now()
   return `<div class="empty"><b>${h}</b><p>${p}</p><button class="btn btn-ghost btn-sm" data-act="collect"${collecting ? ' disabled' : ''}>↻ 现在抓取</button>${ADD}</div>`;
 }
 
-export function queueView({ brand, pending, approved, today, paused, collecting, lastCollect, collectError, posterState, posted, skipped = [], hasThumb = () => false, collectAt, expireMs = 0, hasApi = true }) {
+export function queueView({ brand, pending, approved, today, paused, collecting, lastCollect, collectError, posterState, posted, skipped = [], hasThumb = () => false, collectAt, expireMs = 0, hasApi = true, tokenCheck = null }) {
   const now = Date.now();
   const failed = !collecting && collectError && (!lastCollect || collectError.at > lastCollect.at);
   const sub = collecting || (failed
@@ -99,7 +107,7 @@ export function queueView({ brand, pending, approved, today, paused, collecting,
       ${hasApi ? `<button class="btn btn-ghost btn-sm" data-act="collect"${collecting ? ' disabled' : ''}>↻ 抓取</button>` : ''}
     </header>
     <div class="rv-scroll" id="scroll">
-      ${paused ? pauseBanner(paused) : ''}
+      ${paused ? pauseBanner(paused) : fbStatus(tokenCheck, now)}
       <div class="slots">${today.map(s => slotCard(s, todayEntries.find(x => x.slot.label === s.label), paused, posted[s.draftId])).join('')}</div>
       ${pending.length
         ? `<div class="list">${pending.map(d => card(d, posterState(d), expireMs, now)).join('')}</div>`

@@ -92,6 +92,7 @@ export function cleanupFiles(now = Date.now()) {
    nothing is known about the token: no pause, and the daily runner asks again a minute later. */
 export async function tokenCheck() {
   const r = await checkToken();
+  kv.set('tokenCheck', { at: Date.now(), ok: r.ok, transient: !!r.transient }); // the queue page shows when it last passed
   if (r.ok) {
     log('debug_token ok');
     const p = pause.get();

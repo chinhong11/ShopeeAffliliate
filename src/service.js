@@ -6,8 +6,8 @@ import { loadConfig, dirs } from './config.js';
 import { drafts, kv, ymd, db, dayStr, newDraftId } from './db.js';
 import { newForm, withCaptions } from './draft.js';
 import * as shopee from './shopee.js';
-import { posterKey, TPL, endAtFrom, T8_CAPS } from './mapping.js';
-import { refreshCaptions, availability, isPersonal, suggest } from './pick.js';
+import { posterKey, TPL, endAtFrom, T8_CAPS, rm } from './mapping.js';
+import { refreshCaptions, refreshHeadline, swapNumbers, availability, isPersonal, suggest } from './pick.js';
 import { renderDraft, posterFile, thumbFile } from './render.js';
 import { upcoming } from './slots.js';
 import { collect } from './collect.js';
@@ -268,7 +268,8 @@ function writePhoto(base, dataUrl) {
 /* ＋ 手动添加 (no Shopee API yet): product details, photos and the affiliate link typed in by hand → a draft.
    It never calls the API: no short link (the pasted link is posted as it is), no price re-check before posting. */
 const SHOPEE_HOST = /(^|\.)(shopee\.com\.my|shope\.ee)$/;
-export function addManual(b) {
+/* the typed-in product fields, checked; shared by 手动添加 and 商品资料 on the edit page */
+function manualFields(b) {
   b = b && typeof b === 'object' ? b : {};
   const name = String(b.name || '').trim().slice(0, 200);
   if (!name) throw new Error('请填商品名称');
@@ -281,25 +282,69 @@ export function addManual(b) {
   let url;
   try { url = new URL(String(b.link || '').trim()); } catch { throw new Error('推广链接不对：从 Shopee Affiliate 复制完整链接'); }
   if (url.protocol !== 'https:' || !SHOPEE_HOST.test(url.hostname)) throw new Error('推广链接要是 Shopee 的链接（https://s.shopee.com.my/… 或 https://shope.ee/…）');
+  return {
+    name, price, priceMax: price, originalPrice: was, disc: was ? Math.round((1 - price / was) * 100) : 0,
+    rating, sales, productLink: url.href, checkedAt: Date.now() // checkedAt: when the price was last typed in (see priceQuestion)
+  };
+}
+const ITEM_IDS = /-i\.(\d+)\.(\d+)|\/product\/(\d+)\/(\d+)/; // a full product link names its shop and item
+
+/* the same product already waiting, or posted within noRepeatDays: '' if neither */
+export function manualDuplicate(link, itemId = '', cfg = loadConfig(), now = Date.now()) {
+  const rows = db.prepare(`SELECT status, (SELECT MAX(at) FROM posts WHERE draft_id=drafts.id AND kind='posted') posted FROM drafts
+    WHERE json_extract(product, '$.productLink')=? OR (?<>'' AND item_id=?)`).all(link, itemId, itemId);
+  if (rows.some(r => ['draft', 'approved', 'posting', 'failed'].includes(r.status))) return '这个商品已经在待审核或排队中了。';
+  const last = Math.max(0, ...rows.map(r => r.posted || 0));
+  if (last > now - cfg.noRepeatDays * 86400e3) {
+    const days = Math.floor((now - last) / 86400e3);
+    return `这个商品${days ? ` ${days} 天前` : '今天'}发过了（设置是 ${cfg.noRepeatDays} 天内不重复发）。`;
+  }
+  return '';
+}
+
+/* returns { duplicate } instead of adding when the product is already there, unless force */
+export function addManual(b) {
+  b = b && typeof b === 'object' ? b : {};
+  const m = manualFields(b);
   const photos = Array.isArray(b.photos) ? b.photos.slice(0, 4) : [];
   if (!photos.length) throw new Error('至少加 1 张商品照片');
+  const cfg = loadConfig(), ids = ITEM_IDS.exec(new URL(m.productLink).pathname) || [];
+  if (!b.force) { const duplicate = manualDuplicate(m.productLink, ids[2] || ids[4] || '', cfg); if (duplicate) return { duplicate }; }
 
-  const cfg = loadConfig(), id = newDraftId();
-  const ids = /-i\.(\d+)\.(\d+)|\/product\/(\d+)\/(\d+)/.exec(url.pathname) || []; // a full product link names its shop and item
+  const id = newDraftId();
   const files = photos.map((p, i) => writePhoto(i ? `up-${id}-${i}` : `m-${id}`, p));
-  const p = {
-    itemId: ids[2] || ids[4] || 'm' + id, shopId: ids[1] || ids[3] || '', name, shopName: '', imageUrl: '',
-    price, priceMax: price, originalPrice: was, disc: was ? Math.round((1 - price / was) * 100) : 0,
-    rating, sales, comm: null, productLink: url.href, offerLink: '', manual: true, img: files[0]
-  };
+  const p = { itemId: ids[2] || ids[4] || 'm' + id, shopId: ids[1] || ids[3] || '', shopName: '', imageUrl: '', comm: null, offerLink: '', manual: true, img: files[0], ...m };
   const pickState = kv.get('pickState', { prev: null, rot: {} });
   const form = newForm({ p }, cfg, pickState);
   form.photos = ['img:' + files[0], ...files.slice(1).map(f => 'up:' + f)];
-  const d = withCaptions({ id, itemId: p.itemId, shopId: p.shopId, strat: 'man', p, form, shortLink: url.href, subIds: [], collectedDay: dayStr() }, cfg);
+  const d = withCaptions({ id, itemId: p.itemId, shopId: p.shopId, strat: 'man', p, form, shortLink: m.productLink, subIds: [], collectedDay: dayStr() }, cfg);
   drafts.insert(d);
   kv.set('pickState', pickState);
   queuePosters([id]);
   return d;
+}
+
+/* 商品资料 on the edit page: fix a hand-added product's details. Headline and captions follow the new numbers
+   and link the way the pre-post price check updates them (a hand-written text gets its numbers swapped) */
+export function saveManualProduct(id, b) {
+  const d = drafts.get(id);
+  if (!d || !d.p.manual) throw new Error('只有手动添加的商品可以改资料');
+  if (!['draft', 'approved'].includes(d.status)) throw new Error('这张草稿正在发布或已经处理完，不能再改了');
+  const cfg = loadConfig(), o = d.p, p = { ...o, ...manualFields(b) };
+  const f = { ...d.form, ...refreshHeadline(d.form, o, p, cfg) };
+  for (const k of ['cap1', 'cap2']) if (f[k + 'Manual']) f[k] = swapNumbers(f[k], o, p, cfg).split(d.shortLink).join(p.productLink);
+  const nd = { ...d, p, form: f, shortLink: p.productLink };
+  refreshCaptions(nd, cfg);
+  if (!drafts.update(id, { p, form: nd.form, shortLink: nd.shortLink }, { from: ['draft', 'approved'] })) throw new Error('这张草稿刚刚开始发布，改动没有保存');
+  queuePosters([id]);
+  return drafts.get(id);
+}
+
+/* 批准 on a hand-added draft whose price was typed in over a day ago: nothing re-checks it, so ask first ('' = no question) */
+export function priceQuestion(d, now = Date.now()) {
+  if (!d || !d.p.manual || d.status !== 'draft') return '';
+  const days = Math.floor((now - (d.p.checkedAt || d.createdAt)) / 86400e3);
+  return days >= 1 ? `这张是 ${days} 天前填的价格。Shopee 上现在还是 ${rm(d.p.price)} 吗？\n\n确定：照这个价格批准\n取消：先去「编辑 → 商品资料」改价格` : '';
 }
 
 /* posting pause (Facebook token / rate-limit problems). source 'token' pauses are lifted by a passing token check.
