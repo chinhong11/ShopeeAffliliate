@@ -64,6 +64,7 @@ body{background:var(--bg);-webkit-tap-highlight-color:transparent}
 /* 已发布: 推广 opens the post, where Facebook shows its own Boost post button */
 .la{gap:14px}
 .la a.boost{color:#ff7a50}
+.la .btn.del{color:#ff8a9b;min-height:40px}
 .boost-tip{margin:0 16px 4px;line-height:1.6}
 .desk .boost-tip{margin:0 34px 4px}
 /* 手动添加 ← Shopee import bookmark */

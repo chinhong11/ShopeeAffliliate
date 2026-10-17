@@ -181,13 +181,31 @@ export async function publishDraft(id, { slotId = null, dryRun = false, manual =
 
 const oldestApproved = () => drafts.list('approved').find(d => !d.form.postAt) || null; // drafts with their own 发布时间 don't take slots
 
-/* every 5 min: each due, unused slot → oldest approved draft. None approved → slot skipped. */
+/* 已发布 → 删除 */
+export async function deletePosted(rowId) {
+  const r = db.prepare("SELECT * FROM posts WHERE id=? AND kind='posted'").get(rowId);
+  if (!r) throw new Error('这一帖已经不在「已发布」里了');
+  if (r.fb_post_id) {
+    try { await fb.deletePost(r.fb_post_id); }
+    catch (e) {
+      /* Facebook answers code 100 both when the post is already gone (deleted by hand) and when this token may not
+         delete it: only a post that can't be read either counts as gone */
+      if (!(e instanceof fb.FbError && e.code === 100)) throw new Error('Facebook 没让删除：' + fbWords(e.message));
+      const stillThere = await fb.graph('GET', `/${r.fb_post_id}`, { access_token: env.FB_PAGE_TOKEN, fields: 'id' }).then(() => true, x => !(x instanceof fb.FbError && x.code === 100));
+      if (stillThere) throw new Error('帖子还在专页上，Facebook 没让删除：' + fbWords(e.message));
+    }
+  }
+  db.prepare("UPDATE posts SET kind='deleted' WHERE id=?").run(rowId);
+  return { ok: true };
+}
+
+/* every minute: each due, unused slot → oldest approved draft. None approved → slot skipped. */
 export async function publishDue({ now = Date.now(), log = console.log } = {}) {
   const cfg = loadConfig();
   planDay(dayStr(now), cfg);
   const due = db.prepare("SELECT * FROM slots WHERE status='open' AND planned_at<=? ORDER BY planned_at").all(now);
   const out = [];
-  /* 发布时间 set on the draft: posted when it comes (within a tick, 5 min), outside the slots and postsPerDay.
+  /* 发布时间 set on the draft: posted when it comes (within a minute), outside the slots and postsPerDay.
      More than 2 h late (the app was off) → no surprise post: it joins the normal queue instead. */
   for (const d of drafts.list('approved').filter(x => x.form.postAt && x.form.postAt <= now)) {
     if (pause.get()) { log(`${d.id}: own time, publishing paused`); break; }

@@ -346,7 +346,7 @@ function renderWhen() {
   el('atBox').hidden = !at;
   el('postAt').min = toLocal(Date.now());
   if (at) el('postAt').value = toLocal(f.postAt);
-  el('whenHint').textContent = at ? '批准后，到这个时间自动发（最多晚 5 分钟，不占每天的发帖时段）。电脑或服务器要开着。'
+  el('whenHint').textContent = at ? '批准后，到这个时间自动发（1 分钟内发出，不占每天的发帖时段）。电脑或服务器要开着。'
     : `批准后排到下一个空的发帖时段（每天 ${(cfg.postTimes || []).join(' / ')}）。`;
 }
 document.querySelector('.when').onclick = e => {

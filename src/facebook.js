@@ -26,7 +26,7 @@ export async function graph(method, path, params = {}, { file } = {}) {
   const url = new URL(GRAPH() + path);
   const send = async () => {
     let body, res;
-    if (method === 'GET') {
+    if (method === 'GET' || method === 'DELETE') {
       for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     } else {
       body = new FormData();
@@ -75,6 +75,8 @@ export async function postCarousel(pngs, message, names = []) {
   const r = await graph('POST', `/${env.FB_PAGE_ID}/feed`, { ...tok(), message, attached_media: ids.map(id => ({ media_fbid: id })) });
   return { id: r.id, post_id: r.id, media: ids };
 }
+/* DELETE /{post-id}: the post and its comments */
+export const deletePost = postId => (need(), graph('DELETE', `/${postId}`, tok()));
 export const comment = (postId, message) => graph('POST', `/${postId}/comments`, { ...tok(), message });
 export async function permalink(postId) {
   try { return (await graph('GET', `/${postId}`, { ...tok(), fields: 'permalink_url' })).permalink_url || ''; }

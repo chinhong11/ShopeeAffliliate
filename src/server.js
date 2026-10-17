@@ -255,6 +255,7 @@ api.post('/token', wrap(async () => {
   return { ok: false, error: r.problems.join('；') };
 }));
 api.post('/posts/:id/retry', wrap(req => publish.retryPost(Number(req.params.id))));
+api.post('/posts/:id/delete', wrap(req => publish.deletePosted(Number(req.params.id))));
 app.use('/api', api);
 
 app.use((req, res) => res.status(404).send('Not found'));
