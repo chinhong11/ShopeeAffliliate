@@ -6,7 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jobs-'));
-Object.assign(process.env, { DATA_DIR: tmp, TZ: 'Asia/Kuala_Lumpur', CONFIG_FILE: path.join(tmp, 'none.json'), FB_PAGE_TOKEN: '', FB_APP_ID: '', FB_APP_SECRET: '', SHOPEE_MOCK: '1' }); // the collect job runs only with Shopee keys or the mock
+Object.assign(process.env, { GEMINI_API_KEY: '', // never the real key from .env
+  DATA_DIR: tmp, TZ: 'Asia/Kuala_Lumpur', CONFIG_FILE: path.join(tmp, 'none.json'), FB_PAGE_TOKEN: '', FB_APP_ID: '', FB_APP_SECRET: '', SHOPEE_MOCK: '1' }); // the collect job runs only with Shopee keys or the mock
 const { db, kv, dayStr } = await import('../src/db.js');
 const { planDay, upcoming, slotLabels } = await import('../src/slots.js');
 const { loadConfig, dirs } = await import('../src/config.js');

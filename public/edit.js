@@ -21,8 +21,9 @@ const UNLOCK_TXT = {
 };
 
 /* ---------- form markup ---------- */
+/* the template picker and 买家真实评价 stay in the page but hidden: ✨ AI 设计 chooses the poster now */
 $('#form').innerHTML = `
-  <section class="sec">
+  <section class="sec" hidden>
     <div class="sec-h"><span class="ic">🎨</span><h2>模板</h2><span class="tip">自动选：${esc(TPL[f.autoTpl])}</span></div>
     <div class="tps" id="tps"></div>
     <div id="unlock"></div>
@@ -37,15 +38,21 @@ $('#form').innerHTML = `
     <div class="sec-h"><span class="ic">📷</span><h2>照片</h2><span class="tip" id="phTip"></span></div>
     <div class="phs" id="phs"></div>
     <input id="file" type="file" accept="image/*" hidden>
-    <div class="hint">第 1 张是 Shopee 商品图。加照片会自动换排版：2 张双图、3 张三图、4 张四宫格。</div>
+    <div class="hint">每张照片各做一张同款海报（同样的配色、字体和价格），一起发成一个 Facebook 多图帖，最多 4 张。第 1 张是封面。</div>
   </section>
   <section class="sec">
     <div class="toggle-row"><label for="used">我用过这个 <span class="soft">打开后标题和文案可以写亲身体验</span></label><button class="toggle" id="used"></button></div>
   </section>
-  <section class="sec">
+  <section class="sec" hidden>
     <div class="sec-h"><span class="ic">⭐</span><h2>买家真实评价</h2><span class="tip">填了才能用「真实好评」</span></div>
     <div class="field"><textarea id="rq" rows="2" maxlength="80" placeholder="从 Shopee 评价区复制一条买家原话" aria-label="买家真实评价"></textarea></div>
     <div class="field"><label for="ra">署名</label><input id="ra" type="text" maxlength="16" placeholder="— Shopee 买家"></div>
+  </section>
+  <section class="sec">
+    <div class="sec-h"><span class="ic">🕒</span><h2>发布时间</h2></div>
+    <div class="when"><button type="button" class="btn btn-ghost btn-sm" data-when="auto">自动排队</button><button type="button" class="btn btn-ghost btn-sm" data-when="at">指定时间</button></div>
+    <div class="field" id="atBox" hidden><label for="postAt">发布日期和时间</label><input id="postAt" type="datetime-local"></div>
+    <div class="hint" id="whenHint"></div>
   </section>
   <section class="sec">
     <div class="sec-h"><span class="ic">💬</span><h2>Facebook 文案</h2><button class="btn btn-ghost btn-sm" id="rebuild" style="margin-left:auto" hidden>↻ 重新生成</button></div>
@@ -91,7 +98,7 @@ function renderHooks() {
 }
 function renderPhotos() {
   const n = f.photos.length;
-  el('phTip').textContent = `${n} 张 · ${LAYOUT[n]}`;
+  el('phTip').textContent = n > 1 ? `${n} 张 · ${n} 张同款海报` : '1 张 · 海报';
   el('phs').innerHTML = [0, 1, 2, 3].map(i => {
     const ref = f.photos[i];
     if (ref) return `<div class="ph on" style="background-image:url('${imgUrl(ref)}')">${i === 0 ? '<span class="tag">Shopee</span>' : `<button class="x" data-rm="${i}" aria-label="移除这张">×</button>`}</div>`;
@@ -104,8 +111,16 @@ function syncCaptions() {
   if (!f.cap2Manual) { f.cap2 = cap2(draft(), cfg); el('c2').value = f.cap2; }
   el('rebuild').hidden = !(f.cap1Manual || f.cap2Manual);
 }
+/* every page of a multi-photo draft (same design), as last drawn; a page not drawn yet hides itself */
+function renderPages(show = true) {
+  const sf = JSON.parse(savedForm), n = sf.tpl === 't8' ? 0 : Math.min(4, sf.photos.length), box = el('pages');
+  box.hidden = !show || n < 2 || !!$('.ed-pv .pvw.raw');
+  box.innerHTML = n < 2 ? '' : `<div class="lbl">全部海报 · ${n} 张 <span class="soft">同一个设计，一起发</span></div><div class="pgs">${
+    Array.from({ length: n }, (_, i) => `<a href="/posters/${d.id}-p${i + 1}.jpg?k=${encodeURIComponent(savedKey)}" target="_blank" rel="noopener"><img src="/posters/${d.id}-p${i + 1}.jpg?k=${encodeURIComponent(savedKey)}" alt="第 ${i + 1} 张海报" onerror="this.parentNode.hidden=true"></a>`).join('')}</div>`;
+}
 function setPoster(state, msg) {
   const box = $('.ed-pv .pvw'); if (!box) return;
+  renderPages(state === 'ok' || state === 'none');
   box.querySelectorAll('.pv-over').forEach(n => n.remove());
   if (state === 'busy') box.insertAdjacentHTML('beforeend', `<div class="pv-over"><i class="spin"></i><span>${box.classList.contains('raw') ? '生成海报中…' : '重新生成中…'}</span></div>`);
   if (state === 'err') box.insertAdjacentHTML('beforeend', `<div class="pv-over"><span>${esc(msg || '海报没生成出来')}</span></div>`);
@@ -168,7 +183,7 @@ el('file').onchange = async e => {
     const url = await new Promise((res, rej) => {
       const im = new Image(); im.onerror = () => rej(new Error('读不了这张照片'));
       im.onload = () => {
-        const s = Math.min(1, 1080 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+        const s = Math.min(1, 2048 / Math.max(im.width, im.height)), c = document.createElement('canvas');
         c.width = Math.round(im.width * s); c.height = Math.round(im.height * s);
         c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
         URL.revokeObjectURL(im.src); res(c.toDataURL('image/jpeg', 0.86));
@@ -250,13 +265,6 @@ el('approve').onclick = async () => {
     location.href = '/';
   } catch (e) { busy = false; syncDirty(); setPoster('none'); toast(e.message); }
 };
-/* desktop: open the studio on this draft; its 保存到草稿 sends the changes back (public/studio-bridge.js) */
-el('studio').onclick = async () => {
-  const w = window.open('about:blank', '_blank'); // opened right away so the browser doesn't block it
-  try { if (saving) await saving; if (unsaved()) await save(false); } catch (e) { toast(e.message); }
-  if (w) w.location.href = `/studio/Shopee%20Post%20Maker%20v3.html?draft=${encodeURIComponent(d.id)}`;
-  else toast('Studio 没打开（被浏览器拦截了？）');
-};
 /* the studio saved this draft: show what it made. This page has nothing unsaved by then (it saved when you
    switched tabs); anything typed in the last moment is dropped rather than written over the studio's changes. */
 let reloading = false;
@@ -311,4 +319,46 @@ if (d.p.manual) {
   };
 }
 
-syncUsed(); renderTps(); renderHooks(); renderPhotos(); syncCaptions(); syncDirty(); waitPoster();
+/* ✨ AI 写文案 (when GEMINI_API_KEY is set): the draft is saved first, the new captions count as hand-edited */
+if (cfg.ai) {
+  el('c1').closest('.field').insertAdjacentHTML('beforebegin', '<button class="btn btn-ghost ai-cap" id="aiCap" type="button">✨ AI 写文案</button>');
+  el('aiCap').onclick = async () => {
+    const b = el('aiCap');
+    b.disabled = true; b.textContent = '✨ 写文案中…';
+    try {
+      if (saving) await saving; if (unsaved()) await save(false);
+      const r = await api(`/drafts/${d.id}/ai-caption`, {});
+      f.cap1 = r.cap1; f.cap2 = r.cap2; f.cap1Manual = f.cap2Manual = true;
+      el('c1').value = f.cap1; el('c2').value = f.cap2;
+      changed();
+      toast('AI 写好了 · 看一下，可以直接改');
+      b.textContent = '✨ 再写一个';
+    } catch (e) { toast(e.message); b.textContent = '✨ AI 写文案'; }
+    b.disabled = false;
+  };
+}
+
+/* 发布时间: datetime-local works in the browser's local time (Malaysia, like the server) */
+const toLocal = ms => new Date(ms - new Date(ms).getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
+function renderWhen() {
+  const at = !!f.postAt;
+  document.querySelectorAll('[data-when]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.when === 'at') === at)));
+  el('atBox').hidden = !at;
+  el('postAt').min = toLocal(Date.now());
+  if (at) el('postAt').value = toLocal(f.postAt);
+  el('whenHint').textContent = at ? '批准后，到这个时间自动发（最多晚 5 分钟，不占每天的发帖时段）。电脑或服务器要开着。'
+    : `批准后排到下一个空的发帖时段（每天 ${(cfg.postTimes || []).join(' / ')}）。`;
+}
+document.querySelector('.when').onclick = e => {
+  const b = e.target.closest('[data-when]'); if (!b) return;
+  if (b.dataset.when === 'auto') f.postAt = null;
+  else if (!f.postAt) { const t = new Date(); t.setHours(t.getHours() + 2, 0, 0, 0); f.postAt = t.getTime(); }
+  renderWhen();
+};
+el('postAt').onchange = () => {
+  const t = new Date(el('postAt').value).getTime();
+  if (!(t > Date.now())) { toast('这个时间已经过了，选一个以后的时间'); renderWhen(); return; }
+  f.postAt = t; renderWhen();
+};
+
+syncUsed(); renderTps(); renderHooks(); renderPhotos(); syncCaptions(); syncDirty(); renderWhen(); renderPages(!$('.ed-pv .pvw[data-pending]')); waitPoster(); // a poster still being drawn: its pages show once it is done

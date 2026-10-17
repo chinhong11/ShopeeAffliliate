@@ -92,6 +92,10 @@ const ACT = {
     toast('已跳过', async () => { await api(`/drafts/${id}/unskip`, {}); await refresh(); });
   },
   async unapprove(id) { await api(`/drafts/${id}/unapprove`, {}); await refresh(); toast('已撤回，回到待审核'); },
+  async remove(id) {
+    if (!confirm('删除这张草稿？删除后不能恢复。')) return;
+    await api(`/drafts/${id}/remove`, {}); await refresh(); toast('已删除');
+  },
   async unskip(id) { await api(`/drafts/${id}/unskip`, {}); await refresh(); toast('已恢复，回到待审核'); },
   async render(id) {
     if ($('#ed')) { document.dispatchEvent(new CustomEvent('rv:render', { detail: id })); return; } // edit screen re-renders itself
@@ -104,6 +108,11 @@ const ACT = {
     document.querySelectorAll('[data-act=collect]').forEach(b => b.disabled = true);
     if (!r.started) toast('已经在抓取了');
     watch();
+  },
+  async gmodel(id, btn) {
+    btn.disabled = true;
+    try { const r = await api('/gemini/model', { id }); await refresh(); toast('现在用 ' + r.model); }
+    catch (e) { btn.disabled = false; toast(e.message); }
   },
   async token(_, btn) {
     btn.disabled = true;
@@ -122,5 +131,12 @@ document.addEventListener('click', e => {
   if (!b || !ACT[b.dataset.act]) return;
   e.preventDefault(); e.stopPropagation();
   ACT[b.dataset.act](b.dataset.id, b).catch(err => toast(err.message));
+});
+/* 数据 → Gemini limits: a changed box saves that model's three numbers */
+document.addEventListener('change', async e => {
+  const i = e.target.closest('[data-limit]'); if (!i) return;
+  const body = { id: i.dataset.model };
+  for (const x of document.querySelectorAll(`[data-model="${CSS.escape(i.dataset.model)}"]`)) body[x.dataset.limit] = x.value.trim();
+  try { await api('/gemini/limits', body); toast('已记下 ' + i.dataset.model + ' 的限额'); } catch (err) { toast(err.message); }
 });
 watch();

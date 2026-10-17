@@ -47,7 +47,8 @@ const graphSrv = http.createServer((req, res) => {
 });
 await new Promise(r => shopeeSrv.listen(0, '127.0.0.1', r));
 await new Promise(r => graphSrv.listen(0, '127.0.0.1', r));
-Object.assign(process.env, {
+Object.assign(process.env, { GEMINI_API_KEY: '', // never the real key from .env
+ 
   DATA_DIR: tmp, CONFIG_FILE: cfgFile, TZ: 'Asia/Kuala_Lumpur', SHOPEE_MOCK: '0', SHOPEE_APP_ID: 'a', SHOPEE_APP_SECRET: 's',
   SHOPEE_ENDPOINT: `http://127.0.0.1:${shopeeSrv.address().port}/graphql`,
   FB_GRAPH_BASE: `http://127.0.0.1:${graphSrv.address().port}`, FB_PAGE_ID: 'page', FB_PAGE_TOKEN: 'tok'

@@ -219,6 +219,8 @@ function applyVars(){
   post.style.setProperty('--scrim',state.scrim/100);
   post.style.setProperty('--badgec',state.badgec);
   post.style.setProperty('--postbg',state.bg);
+  /* ✨ AI 设计 (from the app): panel colour, accent (price, buttons, seal), white text on a dark panel; '' = the template's own */
+  for(const [v,k] of [['--panel','panel'],['--accent','accent'],['--panelink','panelInk']])state[k]?post.style.setProperty(v,state[k]):post.style.removeProperty(v);
   post.style.setProperty('--titlefont',state.font+',sans-serif');
   post.style.setProperty('--burst','polygon(50% 0%,60% 12%,74% 4%,78% 19%,94% 17%,90% 32%,100% 40%,89% 50%,100% 60%,90% 68%,94% 83%,78% 81%,74% 96%,60% 88%,50% 100%,40% 88%,26% 96%,22% 81%,6% 83%,10% 68%,0% 60%,11% 50%,0% 40%,10% 32%,6% 17%,22% 19%,26% 4%,40% 12%)');
   cls('mk',state.hl);
@@ -679,7 +681,7 @@ function init(){
 
   /* export */
   async function snapshot(){
-    return await htmlToImage.toPng(post,{width:1080,height:1080,pixelRatio:1,style:{transform:'none'}});
+    return await htmlToImage.toPng(post,{width:1080,height:1080,pixelRatio:2,style:{transform:'none'}}); // 2160px: Facebook keeps up to 2048px
   }
   function dl(url,name){
     const a=document.createElement('a');a.href=url;a.download=name;a.click();

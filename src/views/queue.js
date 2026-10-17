@@ -118,11 +118,12 @@ export function queueView({ brand, pending, approved, today, paused, collecting,
         <a class="qt" href="/d/${d.id}"><b>${esc(shortName(d.p.name))}</b><span>✓ ${slot ? esc(slot.text) + ' 发布' : '等空位'}</span></a>
         <button class="btn btn-ghost btn-sm" data-act="unapprove" data-id="${d.id}">撤回</button>
       </div>`).join('')}</div>` : ''}
-      ${skipped.length ? `<details class="skp" id="skipped"><summary class="lbl">已跳过 · ${skipped.length} <span class="soft">点开可以恢复</span></summary>
+      ${skipped.length ? `<details class="skp" id="skipped"><summary class="lbl">已跳过 · ${skipped.length} <span class="soft">点开可以恢复或删除</span></summary>
       <div class="qlist">${skipped.map(d => `<div class="qrow">
         <img src="${hasThumb(d) ? `/posters/${d.id}.jpg?k=${encodeURIComponent(d.posterKey || '')}` : `/img/${encodeURIComponent(d.p.img)}`}" alt="">
         <div class="qt"><b>${esc(shortName(d.p.name))}</b><span class="dim">${dayStr(d.updatedAt) === dayStr(now) ? '今天' : zhDate(d.updatedAt)} ${fmtTime(d.updatedAt)} 跳过</span></div>
         <button class="btn btn-ghost btn-sm" data-act="unskip" data-id="${d.id}">恢复</button>
+        <button class="btn btn-ghost btn-sm del" data-act="remove" data-id="${d.id}" aria-label="删除这张草稿">删除</button>
       </div>`).join('')}</div></details>` : ''}
       <div class="endpad"></div>
     </div>`;

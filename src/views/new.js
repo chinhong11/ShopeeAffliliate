@@ -1,5 +1,5 @@
 /* ＋ 手动添加 — a product typed in by hand (no Shopee API); /static/new.js uploads it */
-import { page } from './html.js';
+import { page, esc } from './html.js';
 
 export function newView({ brand, count }) {
   const body = `<div class="ed" id="nw">
@@ -8,6 +8,17 @@ export function newView({ brand, count }) {
       <b class="tt">手动添加商品</b>
     </div>
     <div class="rv-scroll" id="scroll"><form class="ed-form" id="nf" novalidate>
+      <section class="sec desk-only bm-sec">
+        <div class="sec-h"><span class="ic">⚡</span><h2>从 Shopee 一键导入</h2><span class="tip">电脑 Chrome</span></div>
+        <p class="hint">① 把下面的按钮<b>拖到书签栏</b>（只要做一次）　② 打开 Shopee 商品页　③ 点书签：资料和照片会自动填到这里。</p>
+        <a class="btn btn-ghost bm" id="bm" href="#" onclick="event.preventDefault();alert('把这个按钮拖到书签栏，再到 Shopee 商品页上点它')">📥 导入到 ${esc(brand)} 后台</a>
+      </section>
+      <section class="sec" id="imp" hidden>
+        <div class="sec-h"><span class="ic">📥</span><h2>从 Shopee 导入的照片</h2><span class="tip" id="pickTip"></span></div>
+        <div class="phs pick" id="pick"></div>
+        <div class="field imp-url"><label>商品网址 <span class="soft">在 Shopee Affiliate「自定义链接」贴上它，生成你的推广链接</span></label>
+          <div class="imp-row"><code id="impUrl"></code><button type="button" class="btn btn-ghost btn-sm" id="impCopy">复制</button></div></div>
+      </section>
       <section class="sec">
         <div class="sec-h"><span class="ic">📷</span><h2>照片</h2><span class="tip" id="phTip">0 / 4</span></div>
         <div class="phs" id="phs"></div>

@@ -9,7 +9,7 @@ import { isAuthed, sessionCookie, clearCookie, tryLogin } from './auth.js';
 import * as svc from './service.js';
 import { todayView } from './slots.js';
 import { posterKey, studioState, STRATS, TPL } from './mapping.js';
-import { thumbFile, viewFile, posterFile, closeBrowser } from './render.js';
+import { thumbFile, viewFile, posterFile, pageFile, closeBrowser } from './render.js';
 import * as fb from './facebook.js';
 import * as publish from './publish.js';
 import { startJobs, stopJobs } from './jobs.js';
@@ -20,7 +20,9 @@ import { editView } from './views/edit.js';
 import { logView } from './views/log.js';
 import { statsView } from './views/stats.js';
 import { newView } from './views/new.js';
+import { designsView } from './views/designs.js';
 import { ready as shopeeReady } from './shopee.js';
+import * as gemini from './gemini.js';
 
 export const app = express();
 /* req.ip (login limit) may only come from X-Forwarded-For when a proxy we trust sets it: on by default on
@@ -42,7 +44,9 @@ app.get('/healthz', (req, res) => {
   try { db.prepare('SELECT 1').get(); res.json({ ok: true, paused: !!svc.pause.get() }); }
   catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
-app.use('/static', express.static(path.join(ROOT, 'public'), { maxAge: '1h' }));
+/* scripts are checked for a newer copy on every load (a cheap 304 when unchanged): they import each other by plain
+   URL, so a version in the URL would load a second copy of app.js; an hour-old script once ran against a new page */
+app.use('/static', express.static(path.join(ROOT, 'public'), { maxAge: '1h', setHeaders: (res, f) => { if (f.endsWith('.js')) res.set('Cache-Control', 'no-cache'); } }));
 app.get('/static/studio-ui-v3.css', (req, res) => sendFile(res, path.join(ROOT, 'studio/studio-ui-v3.css')));
 app.get('/static/review-app.css', (req, res) => sendFile(res, path.join(ROOT, 'design/review-app.css')));
 app.get('/manifest.webmanifest', (req, res) => res.type('application/manifest+json').send(JSON.stringify({
@@ -82,8 +86,9 @@ app.use('/studio', express.static(path.join(ROOT, 'studio')));
 app.get('/shared/:f', (req, res) => ['mapping.js', 'pick.js'].includes(req.params.f) ? sendFile(res, path.join(ROOT, 'src', req.params.f), 'text/javascript') : res.status(404).end());
 app.get('/posters/:f', (req, res) => {
   /* {id}.png, {id}-1..4.png (t8 pages), {id}.jpg (card), {id}-v.jpg (edit page) */
-  const m = /^(d[0-9a-f]+)(?:-([1-4]|v))?\.(png|jpg)$/.exec(req.params.f);
-  const file = !m ? null : m[3] === 'png' ? (m[2] === 'v' ? null : posterFile(m[1], m[2] ? +m[2] : 0)) : !m[2] ? thumbFile(m[1]) : m[2] === 'v' ? viewFile(m[1]) : null;
+  const m = /^(d[0-9a-f]+)(?:-([1-4]|v|o[1-4]|p[1-4]))?\.(png|jpg)$/.exec(req.params.f);
+  const file = !m ? null : m[2] && m[2][0] === 'o' ? (m[3] === 'jpg' ? svc.optionFile(m[1], +m[2][1] - 1) : null) :
+    m[2] && m[2][0] === 'p' ? (m[3] === 'jpg' ? pageFile(m[1], +m[2][1]) : null) : m[3] === 'png' ? (m[2] === 'v' ? null : posterFile(m[1], m[2] ? +m[2] : 0)) : !m[2] ? thumbFile(m[1]) : m[2] === 'v' ? viewFile(m[1]) : null;
   if (!file) return res.status(404).end();
   res.set('Cache-Control', 'private, max-age=31536000'); // URLs carry ?k=posterKey
   sendFile(res, file);
@@ -118,6 +123,11 @@ app.get('/', (req, res) => {
   }));
 });
 
+app.get('/d/:id/designs', (req, res) => {
+  const d = drafts.get(req.params.id);
+  if (!d || !['draft', 'approved'].includes(d.status)) return res.redirect('/');
+  res.send(designsView({ brand: brand(), d, count: pendingCount(), ai: gemini.enabled() }));
+});
 app.get('/new', (req, res) => res.send(newView({ brand: brand(), count: pendingCount() })));
 
 app.get('/d/:id', (req, res) => {
@@ -125,7 +135,7 @@ app.get('/d/:id', (req, res) => {
   if (!d || !['draft', 'approved'].includes(d.status)) return res.redirect('/');
   const cfg = loadConfig();
   const st = posterState(d, cfg);
-  res.send(editView({ brand: brand(), d, st, cfg, count: pendingCount(), dirty: st.hasPoster && !st.busy && d.posterKey !== posterKey(d, cfg) }));
+  res.send(editView({ brand: brand(), d, st, cfg: { ...cfg, ai: gemini.enabled() }, count: pendingCount(), dirty: st.hasPoster && !st.busy && d.posterKey !== posterKey(d, cfg) }));
 });
 
 app.get('/log', (req, res) => {
@@ -137,7 +147,7 @@ app.get('/log', (req, res) => {
   res.send(logView({ brand: brand(), rows, count: pendingCount(), imgOf }));
 });
 
-app.get('/stats', (req, res) => {
+app.get('/stats', async (req, res) => {
   const range = req.query.r === '30' ? '30' : '7';
   const since = Date.now() - Number(range) * 86400e3;
   const posts = db.prepare("SELECT strategy, tpl FROM posts WHERE kind='posted' AND at>=?").all(since);
@@ -153,13 +163,15 @@ app.get('/stats', (req, res) => {
     orders: conv.reduce((a, c) => a + (c.o || 0), 0), comm: conv.reduce((a, c) => a + (c.c || 0), 0),
     strat: group('strategy', STRATS), tpl: group('tpl', TPL)
   };
-  res.send(statsView({ brand: brand(), range, s, count: pendingCount() }));
+  let models = [], modelsError = '';
+  try { models = await gemini.listModels(); } catch (e) { modelsError = e.message; }
+  res.send(statsView({ brand: brand(), range, s, count: pendingCount(), gem: { ...gemini.usage(), models, modelsError } }));
 });
 
 /* ---------- JSON API (custom header: browsers can't send it cross-site without CORS) ---------- */
 const api = express.Router();
 api.use((req, res, next) => req.method === 'GET' || req.get('X-Requested-With') === 'rv' ? next() : res.status(403).json({ error: 'bad request' }));
-api.use(express.json({ limit: '6mb' }));
+api.use(express.json({ limit: '24mb' })); // 手动添加: up to 4 photos of 2048px as data: URLs
 const wrap = fn => async (req, res) => {
   try { res.json(await fn(req, res) ?? { ok: true }); }
   catch (e) { console.error(req.method, req.path, e.message); res.status(400).json({ error: e.message }); }
@@ -170,7 +182,10 @@ api.get('/status', wrap(() => ({
   rendering: [...svc.status.rendering, ...svc.status.queued], paused: svc.pause.get()
 })));
 api.post('/collect', wrap(() => ({ started: svc.runCollect() })));
-api.post('/manual', wrap(req => { const r = svc.addManual(req.body); return r.duplicate ? { duplicate: r.duplicate } : { id: r.id }; }));
+api.post('/manual', wrap(async req => {
+  const sent = Array.isArray(req.body && req.body.photos) ? req.body.photos : [];
+  console.log(`手动添加: ${sent.length} photo(s), ${sent.filter(x => typeof x === 'string' && x.startsWith('https:')).length} from Shopee`);
+  const r = svc.addManual({ ...req.body, photos: await svc.importPhotos(sent) }); return r.duplicate ? { duplicate: r.duplicate } : { id: r.id }; }));
 api.post('/drafts/:id/product', wrap(req => { svc.saveManualProduct(req.params.id, req.body); return { ok: true }; }));
 api.post('/drafts/:id/approve', wrap(async req => {
   const question = !(req.body && req.body.priceOk) && svc.priceQuestion(drafts.get(req.params.id));
@@ -180,6 +195,7 @@ api.post('/drafts/:id/approve', wrap(async req => {
 }));
 api.post('/drafts/:id/skip', wrap(req => svc.skip(req.params.id)));
 api.post('/drafts/:id/unskip', wrap(req => svc.unskip(req.params.id)));
+api.post('/drafts/:id/remove', wrap(req => svc.removeSkipped(req.params.id)));
 api.post('/drafts/:id/unapprove', wrap(req => svc.unapprove(req.params.id)));
 api.post('/drafts/:id/save', wrap(async req => {
   const d = svc.saveForm(req.params.id, req.body.form);
@@ -187,6 +203,27 @@ api.post('/drafts/:id/save', wrap(async req => {
   else if (req.body.queue && !svc.posterFresh(d)) svc.queuePosters([d.id]); // leaving the page: refresh the poster in the background (autosaves don't)
   const n = drafts.get(d.id);
   return { form: n.form, posterKey: n.posterKey, posterError: n.posterError };
+}));
+/* 数据 → Gemini: which model, and its limits */
+api.post('/gemini/model', wrap(async req => ({ model: await gemini.choose(String((req.body && req.body.id) || '')) })));
+api.post('/gemini/limits', wrap(req => ({ limits: gemini.setLimits(req.body && req.body.id, req.body) })));
+/* ✨ AI 设计 page: the stored options, 4 new ones, an option's preview, using one */
+api.get('/drafts/:id/designs', wrap(req => ({ designs: svc.designOptions(req.params.id).map((o, n) => ({ tpl: o.tpl, why: o.why, preview: fs.existsSync(svc.optionFile(req.params.id, n)) ? `/posters/${req.params.id}-o${n + 1}.jpg?k=${o.at}` : '' })) })));
+api.post('/drafts/:id/designs', wrap(async req => ({ designs: (await svc.newDesignOptions(req.params.id)).map(o => ({ tpl: o.tpl, why: o.why, preview: '' })) })));
+const optionN = req => { const n = Number(req.params.n); if (!(Number.isInteger(n) && n >= 0 && n < 4)) throw new Error('没有这一款'); return n; };
+api.post('/drafts/:id/designs/:n/preview', wrap(async req => ({ preview: await svc.previewOption(req.params.id, optionN(req)) })));
+api.post('/drafts/:id/designs/:n/use', wrap(req => { svc.useOption(req.params.id, optionN(req)); return { ok: true }; }));
+/* ✨ AI 设计海报: a new look for this draft, then its poster */
+api.post('/drafts/:id/ai-design', wrap(async req => {
+  const r = await svc.designDraft(req.params.id);
+  await svc.ensurePoster(req.params.id);
+  return { why: r.why, tpl: r.tpl };
+}));
+/* ✨ AI 写文案: new captions from the saved draft; the edit page shows them and saves them as hand-edited */
+api.post('/drafts/:id/ai-caption', wrap(async req => {
+  const d = drafts.get(req.params.id);
+  if (!d) throw new Error('草稿不存在');
+  return gemini.captions(d, loadConfig());
 }));
 api.post('/drafts/:id/render', wrap(async req => { await svc.ensurePoster(req.params.id, { force: true }); return { posterKey: drafts.get(req.params.id).posterKey }; }));
 /* the edit screen asks this after waiting for a background render */

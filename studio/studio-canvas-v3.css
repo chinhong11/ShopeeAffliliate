@@ -336,3 +336,50 @@
 #post.t4{--fs1:62px;}
 #post.t6c{--fs1:112px;--fs2:54px;}
 #post.t7{--fs1:64px;--fs2:38px;}
+
+/* =====================================================
+   PANEL LAYOUT — 爆款分享 (t1) · 价格暴击 (t2) · 杂志封面 (t6c)
+   The photo keeps the top of the poster to itself (only the badge and the discount seal sit on it);
+   headline, price and button live in a solid panel underneath, so no text ever covers the product.
+   ===================================================== */
+#post.t1 #scrim,#post.t2 #scrim,#post.t6c #scrim{display:none;}
+#post.t1 .sticker,#post.t2 .sticker,#post.t6c .sticker{text-shadow:none;paint-order:normal;}
+#post.t1 #arrow,#post.t2 #arrow,#post.t6c #arrow{display:none;}
+#post.t1 #seal,#post.t2 #seal,#post.t6c #seal{top:40px;right:40px;width:164px;height:164px;}
+#post.t1 #seal .sp,#post.t2 #seal .sp,#post.t6c #seal .sp{font-size:52px;}
+#post.t1 #band,#post.t2 #band,#post.t6c #band{display:block;position:absolute;left:0;right:0;bottom:0;box-shadow:none;}
+
+/* t1 — white panel: headline left, paper price tag right */
+#post.t1{--fs1:64px;--fs2:34px;}
+#post.t1 #grid,#post.t1.no-bar #grid{inset:0 0 430px 0;}
+#post.t1 #band{top:650px;background:var(--panel,#fff);}
+#post.t1 #bottomBar{background:var(--panel,#fff);}
+#post.t1 #caption,#post.t1.no-bar #caption{top:684px;bottom:auto;left:56px;right:400px;gap:10px;}
+#post.t1 #priceTag{top:700px;bottom:auto;right:60px;transform:rotate(3deg);box-shadow:0 10px 26px rgba(0,0,0,.14);border:2px solid #f1ece4;}
+#post.t1 #bottomBar{box-shadow:none;border-top:2px solid #f1ece4;}
+
+/* t2 — cream panel: one-line headline, subtitle, then the big price with the button beside it */
+#post.t2{--fs1:54px;--fs2:30px;}
+#post.t2 #grid{inset:0 0 470px 0;}
+#post.t2 #band{top:610px;background:var(--panel,#fff7ec);}
+#post.t2 #line1{white-space:normal;}
+#post.t2 #caption{top:638px;bottom:auto;left:64px;right:64px;gap:6px;}
+#post.t2 #bigPrice{top:770px;}
+#post.t2 #bigPrice .bp-was{font-size:30px;}
+#post.t2 #bigPrice .bp-now{font-size:124px;margin-top:6px;}
+#post.t2 #bigPrice .scribble{height:18px;margin-top:4px;}
+#post.t2 #ctaFloat{top:836px;right:60px;padding:22px 38px;font-size:34px;}
+
+/* t6 — dark magazine panel: big headline left, price tag right */
+#post.t6c{--fs1:70px;--fs2:34px;}
+#post.t6c #grid{inset:0 0 450px 0;}
+#post.t6c #band{top:630px;background:var(--panel,#17151c);}
+#post.t6c #caption{top:668px;left:64px;right:400px;gap:12px;}
+#post.t6c #line1{line-height:1.08;}
+#post.t6c #priceTag{top:684px;bottom:auto;right:60px;transform:rotate(-3deg);}
+#post.t6c #bottomBar{background:var(--panel,#17151c);backdrop-filter:none;border-top:1px solid rgba(255,255,255,.12);}
+/* ✨ AI 设计: accent colour for price, buttons and the seal; bar text readable on the panel */
+#post.t1,#post.t2,#post.t6c{--red:var(--accent,#e8232e);}
+#post.t1 .bb-proof,#post.t2 .bb-proof,#post.t6c .bb-proof{color:var(--panelink,var(--inkk));}
+#post.t6c .bb-proof{color:var(--panelink,#fff);}
+#post.t1 .bb-proof .sold,#post.t2 .bb-proof .sold{color:var(--panelink,#6c6c6c);opacity:.85;}

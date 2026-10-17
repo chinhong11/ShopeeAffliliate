@@ -102,7 +102,7 @@ for (const st of cases) {
   fs.writeFileSync(f, png); fs.writeFileSync(path.join(OUT, name + '-button.png'), btn);
   files.push(f);
   const d = await diff(png, btn);
-  const ok = d.size === '1080x1080' && d.changed < 0.001;
+  const ok = d.size === '2160x2160' && d.changed < 0.001; // posters are exported at 2× (post-studio-v3.js snapshot)
   if (!ok) fail++;
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}  ${d.size}  changed ${(d.changed * 100).toFixed(3)}%  mean Δ ${d.mean.toFixed(3)}  ${Date.now() - t} ms`);
 }
@@ -115,7 +115,7 @@ for (const st of cases) {
     const f = path.join(OUT, name + '.png');
     fs.writeFileSync(f, set[i]); files.push(f);
     const d = await diff(set[i], btn[i]);
-    const ok = d.size === '1080x1080' && d.changed < 0.001;
+    const ok = d.size === '2160x2160' && d.changed < 0.001; // posters are exported at 2× (post-studio-v3.js snapshot)
     if (!ok) fail++;
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}  ${d.size}  changed ${(d.changed * 100).toFixed(3)}%  mean Δ ${d.mean.toFixed(3)}${i === 3 ? `  ${Date.now() - t} ms` : ''}`);
   }

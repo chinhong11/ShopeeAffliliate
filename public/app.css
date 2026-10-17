@@ -66,6 +66,20 @@ body{background:var(--bg);-webkit-tap-highlight-color:transparent}
 .la a.boost{color:#ff7a50}
 .boost-tip{margin:0 16px 4px;line-height:1.6}
 .desk .boost-tip{margin:0 34px 4px}
+/* 手动添加 ← Shopee import bookmark */
+.bm-sec .hint{margin:0 0 12px;line-height:1.7}
+.bm-sec .bm{display:inline-flex;min-height:44px;padding:0 18px;cursor:grab;border-style:dashed}
+.pick{grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
+.pick .ph{cursor:pointer;opacity:.55;border-color:var(--line-2)}
+.pick .ph.sel{opacity:1;outline:3px solid var(--shopee);outline-offset:-1px}
+.pick .ph .n{position:absolute;left:5px;top:5px;min-width:22px;height:22px;border-radius:11px;display:grid;place-items:center;background:var(--shopee);color:#fff;font-size:12px;font-weight:900}
+.imp-url{margin-top:14px}
+.imp-row{display:flex;align-items:center;gap:10px}
+.imp-row code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 12px/1.4 ui-monospace,Menlo,monospace;color:var(--muted)}
+#aiDesign{display:inline-flex;margin:14px 10px 0 0;border-color:#6d5bd0;color:#d9d2ff}
+.ai-cap{width:100%;min-height:46px;margin-bottom:14px;border-color:#6d5bd0;color:#d9d2ff}
+.skp .qrow{gap:8px}
+.skp .btn.del{color:#ff8a9b}
 /* the last Facebook token check, above the posting times */
 .fbst{display:flex;align-items:center;gap:12px;margin:0 16px 12px;font-size:13px;font-weight:700;color:var(--okt)}
 .fbst.warn{color:var(--warnt)}
@@ -87,3 +101,45 @@ body{background:var(--bg);-webkit-tap-highlight-color:transparent}
 .desk .empty{max-width:none}
 .desk #nf{max-width:680px;margin:0 auto;padding:8px 16px 24px}
 .desk #nw .ed-bar{grid-template-columns:200px 240px}
+/* edit page: all pages of a multi-photo draft */
+.pages{margin-top:12px}
+.pages .lbl{padding:0 0 8px}
+.pgs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.pgs a{display:block;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.pgs img{width:100%;display:block;aspect-ratio:1/1}
+/* 发布时间 */
+.when{display:flex;gap:8px;margin-bottom:12px}
+.when .btn{min-height:44px;flex:1}
+.when .btn[aria-pressed=true]{border-color:var(--shopee);color:#fff;background:rgba(238,77,45,.18)}
+.gem{margin:0 16px;font-size:13px;line-height:1.7;font-weight:600;color:var(--text)}
+.desk .gem{margin:0 34px;max-width:860px}
+.gem p{margin:0 0 6px}
+.gem .soft{color:var(--muted)}
+.gem .gem-lim{color:var(--warnt)}
+.gem a{color:#ff9a6b}
+.gtab{overflow-x:auto;margin-bottom:10px;border:1px solid var(--line);border-radius:12px}
+.gtab table{border-collapse:collapse;width:100%;min-width:640px;font-size:13px}
+.gtab th{text-align:left;font-size:12px;color:var(--muted);font-weight:700;padding:10px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.gtab td{padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.gtab tr:last-child td{border-bottom:0}
+.gtab tr.cur{background:rgba(79,70,229,.12)}
+.gtab td small{display:block;color:var(--muted);font-weight:600}
+.gtab input{width:86px;min-height:38px;padding:6px 8px;font-size:14px}
+.gtab td.over{color:var(--warnt);font-weight:900}
+.gtab .btn{min-height:38px}
+/* ✨ AI 设计: 4 options */
+.ds-wrap{padding:16px}
+.desk .ds-wrap{max-width:1120px;margin:0 auto;padding:24px 32px}
+.ds-tip{margin:0 0 16px;line-height:1.7}
+.ds-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.desk .ds-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}
+.ds-grid .empty{grid-column:1/-1;margin:0}
+.ds-card{display:flex;flex-direction:column;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px}
+.ds-img{position:relative;aspect-ratio:1/1;border-radius:10px;overflow:hidden;background:var(--panel-2)}
+.ds-img img{width:100%;height:100%;display:block}
+.ds-img .pv-over{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:8px;font-size:12px;font-weight:700;color:var(--muted)}
+.ds-bd{display:flex;flex-direction:column;gap:3px;min-height:52px}
+.ds-bd b{font-size:13px;font-weight:900}
+.ds-bd span{font-size:12px;line-height:1.5;color:var(--muted);font-weight:600}
+.ds-card .btn{min-height:44px}
+.ds-card .btn:disabled{opacity:.5}

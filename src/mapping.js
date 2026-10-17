@@ -9,7 +9,11 @@ export const TPL_LOCK = { t5: '先填买家真实评价', t3: '需要真实结�
 export const TPL_ORDER = ['t1', 't2', 't6', 't5', 't3', 't4', 't8'];
 export const LAYOUT = ['', '单图', '双图', '三图', '四宫格'];
 export const GRID_TPLS = ['t1', 't2', 't3', 't5', 't6'];
+/* photo on top, words in a panel underneath (studio-canvas-v3.css): there is always room for the price */
+export const PANEL = ['t1', 't2', 't6'];
 
+/* is this #rrggbb dark (the text on it should be white)? */
+export const darkHex = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); return 0.299 * r + 0.587 * g + 0.114 * b < 128; };
 export const rm = n => 'RM ' + Number(n).toFixed(2);
 const num = v => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v);
 
@@ -66,7 +70,7 @@ export function productFromOffer(n) {
    so no placeholder survives; see placeholderProblems(). `photoSrc` maps stored photo refs → URLs. */
 export const T8_CAPS = ['', '为什么值得买 ✅', '细节实拍 🔍', '怎么下单 👇'];
 /* 在 Studio 精修 (form.look): the person's own styling, drawn over the app's; product data and photos stay the app's */
-const LOOK_STYLE = ['c1', 'c2', 'ol', 'hl', 'hlc', 'font', 'size', 'align', 'scrim', 'bg', 'ctaText', 'arrow', 'shopee'];
+const LOOK_STYLE = ['c1', 'c2', 'ol', 'hl', 'hlc', 'font', 'size', 'align', 'scrim', 'bg', 'ctaText', 'arrow', 'shopee', 'panel', 'accent'];
 
 export function studioState(d, cfg, photoSrc = x => x) {
   const p = d.p, f = d.form, lang = cfg.language === 'mix' ? 'mix' : 'zh';
@@ -78,10 +82,10 @@ export function studioState(d, cfg, photoSrc = x => x) {
   const mode = cfg.linkMode === 'direct' ? 'direct' : 'comment';
   const b = cfg.brand || {};
   const st = {
-    tpl: f.tpl, layout: n, lang,
+    tpl: f.tpl, layout: f.tpl === 't8' ? n : 1, lang, // one photo per poster; the others are posted beside it (publish.js)
     l1: f.l1 || '', l2: f.l2 || '',
     photos: photos.map(ref => framed(lk.frames, ref)),
-    price: hasDisc(p) || f.tpl === 't2', now: rm(p.price), was: wasOf(p), pct: pctOf(p),
+    price: hasDisc(p) || PANEL.includes(f.tpl), now: rm(p.price), was: wasOf(p), pct: pctOf(p),
     seal: hasDisc(p) && p.disc >= 20, sealLabel: 'OFF',
     proof: hasRating(p) && p.rating >= 4.5, rate: rateOf(p), sold: fmtSold(p.sales, lang),
     voucher: !!code, voucherCode: code,
@@ -106,7 +110,9 @@ export function studioState(d, cfg, photoSrc = x => x) {
     const ph = framed(lk.pageFrames, ref);
     return { ...(typeof ph === 'string' ? { src: ph } : ph), cap: lk.pageCaps && typeof lk.pageCaps[i] === 'string' ? lk.pageCaps[i] : T8_CAPS[i] };
   }) };
+  st.panel = ''; st.accent = ''; // the template's own colours unless the look (✨ AI 设计) sets them
   for (const k of LOOK_STYLE) if (lk[k] !== undefined) st[k] = lk[k];
+  st.panelInk = st.panel && darkHex(st.panel) ? '#ffffff' : '';
   for (const k of ['seal', 'proof', 'cta']) if (lk[k] === false) st[k] = false; // hidden in the studio; never shown where the data turned it off
   return st;
 }

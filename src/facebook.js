@@ -31,7 +31,10 @@ export async function graph(method, path, params = {}, { file } = {}) {
     } else {
       body = new FormData();
       for (const [k, v] of Object.entries(params)) body.append(k, typeof v === 'string' ? v : JSON.stringify(v));
-      if (file) body.append(file.field, new Blob([file.buf], { type: 'image/png' }), file.name);
+      if (file) { /* the type from the bytes: a big poster is a JPEG even in its .png file (render.js) */
+        const type = file.buf[0] === 0xff ? 'image/jpeg' : file.buf[0] === 0x52 && file.buf[8] === 0x57 ? 'image/webp' : 'image/png';
+        body.append(file.field, new Blob([file.buf], { type }), file.name.replace(/\.\w+$/, type === 'image/jpeg' ? '.jpg' : type === 'image/webp' ? '.webp' : '.png'));
+      }
     }
     try { res = await opts.fetchImpl(url, { method, body }); }
     catch (e) { throw new FbError('network: ' + e.message, { status: 599 }); }
@@ -60,12 +63,13 @@ export async function postPhoto(png, message) {
   need();
   return graph('POST', `/${env.FB_PAGE_ID}/photos`, { ...tok(), message, published: 'true' }, { file: { field: 'source', buf: png, name: 'poster.png' } });
 }
-/* carousel (t8): unpublished photos → /{page-id}/feed with attached_media → {id} */
-export async function postCarousel(pngs, message) {
+/* several pictures in one post (t8 pages, or the poster + the draft's other photos): unpublished photos →
+   /{page-id}/feed with attached_media → {id}. names: file names (their extension sets the type), default poster-N.png */
+export async function postCarousel(pngs, message, names = []) {
   need();
   const ids = [];
   for (const [i, png] of pngs.entries()) {
-    const r = await graph('POST', `/${env.FB_PAGE_ID}/photos`, { ...tok(), published: 'false' }, { file: { field: 'source', buf: png, name: `poster-${i + 1}.png` } });
+    const r = await graph('POST', `/${env.FB_PAGE_ID}/photos`, { ...tok(), published: 'false' }, { file: { field: 'source', buf: png, name: names[i] || `poster-${i + 1}.png` } });
     ids.push(r.id);
   }
   const r = await graph('POST', `/${env.FB_PAGE_ID}/feed`, { ...tok(), message, attached_media: ids.map(id => ({ media_fbid: id })) });
