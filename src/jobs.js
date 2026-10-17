@@ -77,7 +77,7 @@ export function cleanupFiles(now = Date.now()) {
   const old = f => { try { return fs.statSync(f).mtimeMs < now - 86400e3; } catch { return false; } }; // never a file being written now
   let n = 0;
   for (const f of fs.readdirSync(dirs.out)) {
-    const m = /^(d[0-9a-f]+)(-[1-4]|-v)?\.(png|jpg)$/.exec(f), id = m && m[1];
+    const m = /^(d[0-9a-f]+)(-[1-4]|-v|-p[1-4])?\.(png|jpg)$/.exec(f), id = m && m[1];
     const keep = m && (keepAll.has(id) || (m[3] === 'jpg' && !m[2] && keepThumb.has(id))); // the -v.jpg goes with the big PNG
     if (!keep && old(path.join(dirs.out, f))) { fs.unlinkSync(path.join(dirs.out, f)); n++; }
   }

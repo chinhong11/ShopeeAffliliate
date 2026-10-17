@@ -32,7 +32,8 @@ const graph = http.createServer((req, res) => {
 });
 await new Promise(r => graph.listen(0, '127.0.0.1', r));
 
-Object.assign(process.env, {
+Object.assign(process.env, { GEMINI_API_KEY: '', // never the real key from .env
+ 
   DATA_DIR: tmp, CONFIG_FILE: cfgFile, SHOPEE_MOCK: '1', TZ: 'Asia/Kuala_Lumpur',
   FB_GRAPH_BASE: `http://127.0.0.1:${graph.address().port}`, FB_PAGE_ID: 'page1', FB_PAGE_TOKEN: 'tok', FB_APP_ID: 'app', FB_APP_SECRET: 'sec'
 });

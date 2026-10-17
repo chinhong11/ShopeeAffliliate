@@ -10,7 +10,8 @@ import { execSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'render-'));
-Object.assign(process.env, { DATA_DIR: tmp, CONFIG_FILE: path.join(tmp, 'none.json'), RENDER_TIMEOUT_MS: '8000' });
+Object.assign(process.env, { GEMINI_API_KEY: '', // never the real key from .env
+  DATA_DIR: tmp, CONFIG_FILE: path.join(tmp, 'none.json'), RENDER_TIMEOUT_MS: '8000' });
 const can = process.platform === 'linux' && (process.env.CHROMIUM_PATH || fs.existsSync(chromium.executablePath()));
 const { renderState, closeBrowser } = await import('../src/render.js');
 test.after(() => closeBrowser());

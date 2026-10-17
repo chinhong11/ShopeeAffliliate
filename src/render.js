@@ -180,13 +180,15 @@ async function renderNow(state, { set = false } = {}) {
     await trimFonts(page, state);
     await page.evaluate(() => window.PostStudio.fit && window.PostStudio.fit()); // headline / price sizes with the final fonts
     const pngUrl = await page.evaluate(() => window.PostStudio.exportPng());
-    const png = toBuf(pngUrl);
+    let png = toBuf(pngUrl);
     /* JPEGs for the review app: 540px for the cards, 1080px for the edit page (a fraction of the PNG's size on a phone) */
-    const jpeg = size => page.evaluate(async ([u, s]) => {
+    const jpeg = (size, q = 0.85) => page.evaluate(async ([u, s, q]) => {
       const i = new Image(); await new Promise((r, j) => { i.onload = r; i.onerror = j; i.src = u; });
       const c = document.createElement('canvas'); c.width = c.height = s; c.getContext('2d').drawImage(i, 0, 0, s, s);
-      return c.toDataURL('image/jpeg', 0.85);
-    }, [pngUrl, size]).then(toBuf);
+      return c.toDataURL('image/jpeg', q);
+    }, [pngUrl, size, q]).then(toBuf);
+    /* a photo-heavy 2160px PNG can pass Facebook's upload size: post a 92 % JPEG of the same size instead */
+    if (png.length > 3.8e6) png = await jpeg(2160, 0.92);
     const thumb = await jpeg(540), view = await jpeg(1080);
     const pages = set ? (await page.evaluate(() => window.PostStudio.exportSet())).map(toBuf) : null;
     const caption = await page.evaluate(() => window.PostStudio.caption());
@@ -219,6 +221,8 @@ export function photoDataUrl(ref) {
 function writeAtomic(file, buf) { const tmp = file + '.tmp'; fs.writeFileSync(tmp, buf); fs.renameSync(tmp, file); }
 export const thumbFile = id => path.join(dirs.out, `${id}.jpg`);
 export const viewFile = id => path.join(dirs.out, `${id}-v.jpg`);
+/* 1080px JPEG of each page of a multi-photo draft, for the edit page (the PNGs are what gets posted) */
+export const pageFile = (id, n) => path.join(dirs.out, `${id}-p${n}.jpg`);
 export const posterFile = (id, n = 0) => path.join(dirs.out, n ? `${id}-${n}.png` : `${id}.png`);
 
 /* render a draft → $DATA_DIR/out/{draftId}.png (t8: also {draftId}-1..4.png).
@@ -230,12 +234,17 @@ export const renderDraft = id => exclusive(async () => {
   try {
     const st = studioState(d, cfg, photoDataUrl);
     const r = await renderNow(st, { set: d.form.tpl === 't8' });
+    /* more than one photo (not the carousel): the same design again on each of the others → {id}-2..4.png, {id}-1 = the first */
+    const more = d.form.tpl === 't8' ? [] : st.photos.slice(1);
+    const pages = r.set || (more.length ? [r.png] : null), views = more.length ? [r.view] : [];
+    for (const ph of more) { const x = await renderNow({ ...st, photos: [ph] }); pages.push(x.png); views.push(x.view); }
     writeAtomic(posterFile(id), r.set ? r.set[0] : r.png);
     writeAtomic(thumbFile(id), r.thumb);
     writeAtomic(viewFile(id), r.view);
-    if (r.set) r.set.forEach((b, i) => writeAtomic(posterFile(id, i + 1), b));
+    if (pages) pages.forEach((b, i) => writeAtomic(posterFile(id, i + 1), b));
+    views.forEach((b, i) => writeAtomic(pageFile(id, i + 1), b));
     drafts.update(id, { posterKey: posterKey(d, cfg), posterError: null });
-    return { file: posterFile(id), files: r.set ? r.set.map((_, i) => posterFile(id, i + 1)) : [posterFile(id)], caption: r.caption };
+    return { file: posterFile(id), files: pages ? pages.map((_, i) => posterFile(id, i + 1)) : [posterFile(id)], caption: r.caption };
   } catch (e) {
     drafts.update(id, { posterError: String(e.message || e).slice(0, 300) });
     throw e;

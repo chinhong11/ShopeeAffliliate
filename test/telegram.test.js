@@ -22,7 +22,8 @@ const tg = http.createServer((req, res) => {
 });
 await new Promise(r => tg.listen(0, '127.0.0.1', r));
 const SECRET = 'testsecret_0123456789';
-Object.assign(process.env, {
+Object.assign(process.env, { GEMINI_API_KEY: '', // never the real key from .env
+ 
   DATA_DIR: tmp, CONFIG_FILE: cfgFile, SHOPEE_MOCK: '1', DISABLE_JOBS: '1', ADMIN_PASSWORD: 'x',
   TELEGRAM_API_BASE: `http://127.0.0.1:${tg.address().port}`, TELEGRAM_BOT_TOKEN: '123:abc', TELEGRAM_CHAT_ID: '42',
   TELEGRAM_WEBHOOK_SECRET: SECRET, PUBLIC_URL: 'https://app.example.com'

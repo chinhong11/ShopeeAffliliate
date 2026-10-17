@@ -9,7 +9,8 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fix-'));
 const cfgFile = path.join(tmp, 'config.json');
 const cfg0 = JSON.parse(fs.readFileSync(new URL('../config.example.json', import.meta.url)));
 fs.writeFileSync(cfgFile, JSON.stringify({ ...cfg0, categories: [{ name: 'T', productCatId: null }] }));
-Object.assign(process.env, { DATA_DIR: tmp, CONFIG_FILE: cfgFile, TZ: 'Asia/Kuala_Lumpur', SHOPEE_MOCK: '1', ADMIN_PASSWORD: 'right-pw', SESSION_SECRET: 'x'.repeat(32), DISABLE_JOBS: '1' });
+Object.assign(process.env, { GEMINI_API_KEY: '', // never the real key from .env
+  DATA_DIR: tmp, CONFIG_FILE: cfgFile, TZ: 'Asia/Kuala_Lumpur', SHOPEE_MOCK: '1', ADMIN_PASSWORD: 'right-pw', SESSION_SECRET: 'x'.repeat(32), DISABLE_JOBS: '1' });
 delete process.env.TRUST_PROXY; delete process.env.RAILWAY_ENVIRONMENT; delete process.env.RENDER; delete process.env.FLY_APP_NAME;
 const { parseDotEnv, loadConfig } = await import('../src/config.js');
 const { shortName, posterKey, endAtFrom, countdown } = await import('../src/mapping.js');

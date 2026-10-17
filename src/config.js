@@ -50,7 +50,11 @@ export const env = {
   TELEGRAM_BOT_TOKEN: e.TELEGRAM_BOT_TOKEN || '',
   TELEGRAM_CHAT_ID: e.TELEGRAM_CHAT_ID || '',
   TELEGRAM_WEBHOOK_SECRET: e.TELEGRAM_WEBHOOK_SECRET || '',
-  CHROMIUM_PATH: e.CHROMIUM_PATH || ''
+  CHROMIUM_PATH: e.CHROMIUM_PATH || '',
+  /* ✨ AI 写文案 (optional): key from Google AI Studio; the alias follows Google's current Flash model */
+  GEMINI_API_KEY: e.GEMINI_API_KEY || '',
+  GEMINI_MODEL: e.GEMINI_MODEL || 'gemini-flash-latest',
+  GEMINI_BASE: (e.GEMINI_BASE || 'https://generativelanguage.googleapis.com').replace(/\/$/, '')
 };
 
 export const CONFIG_FILE = e.CONFIG_FILE ? path.resolve(ROOT, e.CONFIG_FILE) : path.join(ROOT, 'config.json');

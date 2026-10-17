@@ -6,11 +6,12 @@ import { loadConfig, dirs } from './config.js';
 import { drafts, kv, ymd, db, dayStr, newDraftId } from './db.js';
 import { newForm, withCaptions } from './draft.js';
 import * as shopee from './shopee.js';
-import { posterKey, TPL, endAtFrom, T8_CAPS, rm } from './mapping.js';
+import { posterKey, studioState, TPL, endAtFrom, T8_CAPS, rm } from './mapping.js';
 import { refreshCaptions, refreshHeadline, swapNumbers, availability, isPersonal, suggest } from './pick.js';
-import { renderDraft, posterFile, thumbFile } from './render.js';
-import { upcoming } from './slots.js';
+import { renderDraft, renderState, photoDataUrl, posterFile, thumbFile } from './render.js';
+import { upcoming, dayWord, fmtTime } from './slots.js';
 import { collect } from './collect.js';
+import * as gemini from './gemini.js';
 
 export const EXPIRE_MS = 3 * 86400e3; // README: drafts not approved within 3 days expire
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -75,7 +76,7 @@ export function runCollect() {
     .then(r => {
       status.collectResult = { ok: true, created: r.created, at: Date.now() };
       kv.del('lastCollectError');
-      queuePosters(r.ids).then(() => fire(listeners.collected, r));
+      autoDesign(r.ids).then(() => fire(listeners.collected, r));
     })
     .catch(e => {
       status.collectResult = { ok: false, error: e.message, at: Date.now() };
@@ -85,6 +86,51 @@ export function runCollect() {
     })
     .finally(() => { status.collecting = ''; });
   return true;
+}
+
+/* ---------- ✨ AI 设计海报 ---------- */
+/* Gemini picks this draft's template and look (from its main photo and data); saved like a Studio look, so 清除 undoes it */
+export async function designDraft(id) {
+  const d = drafts.get(id);
+  if (!d) throw new Error('草稿不存在');
+  const r = await gemini.design(d, mainPhoto(d));
+  saveForm(id, { tpl: r.tpl, look: { ...r.look, why: r.why, at: Date.now() } });
+  return r;
+}
+/* the AI 设计 page. shortcut: options live in kv until replaced (a few hundred bytes per draft), clear them with the draft if kv grows */
+const mainPhoto = d => {
+  const f = path.join(dirs.img, String(d.form.photos[0] || '').replace(/^\w+:/, ''));
+  return fs.existsSync(f) ? { buf: fs.readFileSync(f), type: /\.png$/i.test(f) ? 'image/png' : /\.webp$/i.test(f) ? 'image/webp' : 'image/jpeg' } : null;
+};
+export const designOptions = id => kv.get('designs:' + id, []);
+export async function newDesignOptions(id) {
+  const d = drafts.get(id);
+  if (!d) throw new Error('草稿不存在');
+  const list = await gemini.designs(d, mainPhoto(d));
+  kv.set('designs:' + id, list.map(x => ({ ...x, at: Date.now() })));
+  return designOptions(id);
+}
+export const optionFile = (id, n) => path.join(dirs.out, `${id}-o${n + 1}.jpg`);
+/* option n drawn with this draft's real photo and numbers (not saved to the draft) */
+export async function previewOption(id, n) {
+  const d = drafts.get(id), o = designOptions(id)[n];
+  if (!d || !o) throw new Error('这款设计已经不在了，重新出一次');
+  const r = await renderState(studioState({ ...d, form: { ...d.form, tpl: o.tpl, look: o.look } }, loadConfig(), photoDataUrl));
+  fs.writeFileSync(optionFile(id, n), r.view);
+  return `/posters/${id}-o${n + 1}.jpg?k=${o.at}`;
+}
+export function useOption(id, n) {
+  const o = designOptions(id)[n];
+  if (!o) throw new Error('这款设计已经不在了，重新出一次');
+  saveForm(id, { tpl: o.tpl, look: { ...o.look, why: o.why, at: Date.now() } });
+  queuePosters([id]);
+}
+
+/* new drafts: designed one after another (free-tier rate limits), then their posters; a failed design keeps the template look */
+export function autoDesign(ids) {
+  if (!gemini.enabled()) return queuePosters(ids);
+  const once = id => designDraft(id).catch(e => { if (!(e.retryMs > 0 && e.retryMs <= 120e3)) throw e; return new Promise(r => setTimeout(r, e.retryMs)).then(() => designDraft(id)); });
+  return ids.reduce((p, id) => p.then(() => once(id).catch(e => console.error('ai design', id, e.message)).then(() => queuePosters([id]))), Promise.resolve());
 }
 
 /* ---------- forms ---------- */
@@ -100,7 +146,7 @@ const int = (v, lo, hi) => { const n = num(v, lo, hi); return n === undefined ? 
 function cleanLook(lk, photos = []) {
   if (!lk || typeof lk !== 'object') return undefined;
   const o = {};
-  for (const k of ['c1', 'c2', 'ol', 'hlc', 'bg']) if (typeof lk[k] === 'string' && HEX.test(lk[k])) o[k] = lk[k];
+  for (const k of ['c1', 'c2', 'ol', 'hlc', 'bg', 'panel', 'accent']) if (typeof lk[k] === 'string' && HEX.test(lk[k])) o[k] = lk[k];
   for (const k of ['hl', 'arrow', 'shopee']) if (typeof lk[k] === 'boolean') o[k] = lk[k];
   for (const k of ['seal', 'proof', 'cta']) if (lk[k] === false) o[k] = false; // can be hidden, never brought back
   if (STUDIO_FONTS.includes(lk.font)) o.font = lk.font;
@@ -109,6 +155,7 @@ function cleanLook(lk, photos = []) {
   if (scrim !== undefined) o.scrim = scrim;
   if (['left', 'center', 'right'].includes(lk.align)) o.align = lk.align;
   if (typeof lk.ctaText === 'string' && lk.ctaText.trim()) o.ctaText = lk.ctaText.trim().slice(0, 24);
+  if (typeof lk.why === 'string' && lk.why.trim()) o.why = lk.why.trim().slice(0, 40);
   const frames = m => {
     const out = {};
     for (const [ref, q] of Object.entries(m && typeof m === 'object' ? m : {})) {
@@ -152,6 +199,8 @@ export function cleanForm(old, f, d = null, cfg = loadConfig()) {
   if (look) n.look = look; else delete n.look;
   for (const k of ['cap1', 'cap2']) if (k in f) n[k] = str(f[k], 2000);
   for (const k of ['cap1Manual', 'cap2Manual']) if (k in f) n[k] = !!f[k];
+  /* 发布时间: a time of your own (ms), or null for the next free slot; a time already past keeps the old value */
+  if ('postAt' in f) n.postAt = !f.postAt ? null : Number.isFinite(+f.postAt) && +f.postAt > Date.now() - 60e3 ? Math.round(+f.postAt) : (old.postAt ?? null);
   if (!own(TPL, n.tpl) || !availability(n)[n.tpl]) n.tpl = n.autoTpl; // locked templates need their real data first
   /* first-person hooks only on drafts marked 我用过 */
   if (!n.used && d && isPersonal(n.l1, cfg)) [n.l1, n.l2] = suggest(d.p, false, cfg)[0];
@@ -238,14 +287,23 @@ export function unskip(id) {
   if (drafts.queuedItem(d.itemId)) throw new Error('这个商品已经有新的草稿了，不用恢复');
   if (!drafts.update(id, { status: 'draft' }, { from: ['skipped'] })) throw new Error('这张草稿刚刚变了，刷新后再看');
 }
+/* 删除 in 已跳过: gone for good. Only a skipped draft (check-and-set on the status); its poster and photo files
+   go with the nightly cleanup, which keeps only files a draft still uses. Post history rows stay. */
+export function removeSkipped(id) {
+  if (!db.prepare("DELETE FROM drafts WHERE id=? AND status='skipped'").run(String(id)).changes) throw new Error('这张草稿已经不在「已跳过」里了');
+}
 export function unapprove(id) { drafts.update(id, { status: 'draft', approvedAt: 0, pendingSince: Date.now() }, { from: ['approved'] }); }
 
-/* approved drafts fill upcoming slots in approval order */
+/* approved drafts fill upcoming slots in approval order; one with its own 发布时间 goes out then instead (k: -1, no slot) */
 export function approvedWithSlots(cfg = loadConfig(), now = Date.now()) {
-  const list = drafts.list('approved');
-  const sl = upcoming(list.length, cfg, now);
-  return list.map((d, i) => ({ d, slot: sl[i] || null }));
+  const list = drafts.list('approved'), queued = list.filter(d => !d.form.postAt);
+  const sl = upcoming(queued.length, cfg, now);
+  return list.map(d => ({ d, slot: d.form.postAt ? { k: -1, plannedAt: d.form.postAt, text: whenText(d.form.postAt, now) + '（指定）' } : sl[queued.indexOf(d)] || null }));
 }
+const whenText = (t, now) => {
+  const k = [0, 1, 2].find(i => dayStr(t) === dayStr(now + i * 86400e3));
+  return (k === undefined ? `${new Date(t).getMonth() + 1}月${new Date(t).getDate()}日` : dayWord(k)) + ' ' + fmtTime(t);
+};
 export const slotOf = id => { const r = approvedWithSlots().find(x => x.d.id === id); return r && r.slot; };
 
 /* photo upload (data:image/jpeg URL, already resized in the browser) → ref */
@@ -256,10 +314,10 @@ export function savePhoto(id, dataUrl) {
   return 'up:' + writePhoto(`up-${id}-${crypto.randomBytes(3).toString('hex')}`, dataUrl);
 }
 function writePhoto(base, dataUrl) {
-  const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ''));
+  const m = /^data:image\/(jpeg|png|webp|avif);base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ''));
   if (!m) throw new Error('照片格式不对');
   const buf = Buffer.from(m[2], 'base64');
-  if (buf.length > 4e6) throw new Error('照片太大');
+  if (buf.length > 5e6) throw new Error('照片太大');
   const name = `${base}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
   fs.writeFileSync(path.join(dirs.img, name), buf);
   return name;
@@ -302,6 +360,30 @@ export function manualDuplicate(link, itemId = '', cfg = loadConfig(), now = Dat
   return '';
 }
 
+/* imported photos arrive as https addresses on Shopee's image hosts: downloaded here into data: URLs for addManual.
+   Only those hosts (the server must not fetch arbitrary addresses for a browser), images only, 4 MB at most */
+const IMG_HOST = /(^|\.)susercontent\.com$/;
+export async function importPhotos(list, fetchImpl = fetch) {
+  if (!Array.isArray(list)) return [];
+  return Promise.all(list.slice(0, 4).map(async (x, i) => {
+    if (typeof x !== 'string' || x.startsWith('data:')) return x;
+    const no = `第 ${i + 1} 张照片`;
+    let u; try { u = new URL(x); } catch { throw new Error(no + '地址不对'); }
+    if (u.protocol !== 'https:' || !IMG_HOST.test(u.hostname)) throw new Error('只能导入 Shopee 的商品照片');
+    let res;
+    /* ask for formats the poster renderer and Facebook both take, so the image host doesn't pick one we refuse */
+    try { res = await fetchImpl(u.href, { headers: { Accept: 'image/jpeg,image/png,image/webp,image/avif;q=0.8' }, signal: AbortSignal.timeout(20000) }); }
+    catch (e) { throw new Error(`${no}从 Shopee 下载失败：${e.message}`); }
+    if (res.url && !IMG_HOST.test(new URL(res.url).hostname)) throw new Error('只能导入 Shopee 的商品照片'); // redirected elsewhere
+    if (!res.ok) throw new Error(`${no}从 Shopee 下载失败（HTTP ${res.status}）`);
+    const type = String(res.headers.get('content-type') || '').split(';')[0].trim();
+    if (!/^image\/(jpeg|png|webp|avif)$/.test(type)) throw new Error(`${no}格式不支持（${type || '未知'}）`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > 4e6) throw new Error(no + '太大（超过 4 MB）');
+    return `data:${type};base64,${buf.toString('base64')}`;
+  }));
+}
+
 /* returns { duplicate } instead of adding when the product is already there, unless force */
 export function addManual(b) {
   b = b && typeof b === 'object' ? b : {};
@@ -320,7 +402,7 @@ export function addManual(b) {
   const d = withCaptions({ id, itemId: p.itemId, shopId: p.shopId, strat: 'man', p, form, shortLink: m.productLink, subIds: [], collectedDay: dayStr() }, cfg);
   drafts.insert(d);
   kv.set('pickState', pickState);
-  queuePosters([id]);
+  autoDesign([id]);
   return d;
 }
 

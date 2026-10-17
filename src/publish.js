@@ -1,7 +1,8 @@
 /* publish approved drafts at their slots (README Step 5). `npm run publish-due [-- --dry-run | --now]` */
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { loadConfig, env } from './config.js';
+import path from 'node:path';
+import { loadConfig, env, dirs } from './config.js';
 import { db, drafts, dayStr } from './db.js';
 import * as shopee from './shopee.js';
 import * as fb from './facebook.js';
@@ -55,11 +56,12 @@ export async function priceCheck(d, { dryRun = false } = {}) {
 
 /* the Facebook payload for a draft (captions as they will be posted, link always present) */
 export function payload(d, cfg = loadConfig()) {
-  const carousel = d.form.tpl === 't8';
+  const n = d.form.tpl === 't8' ? 4 : Math.min(4, d.form.photos.length); // one poster per photo, same design (render.js)
+  const carousel = n > 1;
   const { message, comment } = postTexts(d, cfg);
   return {
     endpoint: carousel ? `POST /${env.FB_PAGE_ID || '{page-id}'}/photos ×4 (published=false) → POST /${env.FB_PAGE_ID || '{page-id}'}/feed attached_media` : `POST /${env.FB_PAGE_ID || '{page-id}'}/photos (source=PNG, published=true)`,
-    images: carousel ? [1, 2, 3, 4].map(i => posterFile(d.id, i)) : [posterFile(d.id)],
+    images: carousel ? Array.from({ length: n }, (_, i) => posterFile(d.id, i + 1)) : [posterFile(d.id)],
     message, comment,
     subIds: d.subIds, shortLink: d.shortLink
   };
@@ -89,7 +91,7 @@ function failBeforePost(d, from, slotId, e) {
 
 /* publish one approved draft now (a 失败 one too with manual: true). Returns {kind: posted|failed|returned|cancelled|dry-run}.
    Throws only for refusals: publishing paused, postsPerDay reached for a post outside the slots. */
-export async function publishDraft(id, { slotId = null, dryRun = false, manual = false } = {}) {
+export async function publishDraft(id, { slotId = null, dryRun = false, manual = false, scheduled = false } = {}) {
   let d = drafts.get(id);
   if (!d) throw new Error('草稿不存在');
   const from = d.status;
@@ -97,7 +99,7 @@ export async function publishDraft(id, { slotId = null, dryRun = false, manual =
   const paused = pause.get();
   if (paused && !dryRun) throw new Error('发布已暂停：' + paused.message);
   const cfg = loadConfig();
-  if (!slotId && !dryRun && postedToday() >= cfg.postsPerDay) throw new Error(`今天已经发了 ${cfg.postsPerDay} 帖（postsPerDay），明天再发`);
+  if (!slotId && !scheduled && !dryRun && postedToday() >= cfg.postsPerDay) throw new Error(`今天已经发了 ${cfg.postsPerDay} 帖（postsPerDay），明天再发`);
 
   let pl, images;
   try {
@@ -144,7 +146,7 @@ export async function publishDraft(id, { slotId = null, dryRun = false, manual =
   setSlot(slotId, 'posting', id);
   let post;
   try {
-    post = d.form.tpl === 't8' ? await fb.postCarousel(images, pl.message) : await fb.postPhoto(images[0], pl.message);
+    post = images.length > 1 ? await fb.postCarousel(images, pl.message, pl.images.map(f => path.basename(f))) : await fb.postPhoto(images[0], pl.message);
   } catch (e) {
     const fatal = e instanceof fb.FbError && e.fatal;
     if (fatal) pause.set(e.code, pauseText(e.code), undefined, fbWords(e.message));
@@ -177,7 +179,7 @@ export async function publishDraft(id, { slotId = null, dryRun = false, manual =
   return { kind: 'posted', postId, permalink: link, commentId, note };
 }
 
-const oldestApproved = () => drafts.list('approved')[0] || null;
+const oldestApproved = () => drafts.list('approved').find(d => !d.form.postAt) || null; // drafts with their own 发布时间 don't take slots
 
 /* every 5 min: each due, unused slot → oldest approved draft. None approved → slot skipped. */
 export async function publishDue({ now = Date.now(), log = console.log } = {}) {
@@ -185,6 +187,15 @@ export async function publishDue({ now = Date.now(), log = console.log } = {}) {
   planDay(dayStr(now), cfg);
   const due = db.prepare("SELECT * FROM slots WHERE status='open' AND planned_at<=? ORDER BY planned_at").all(now);
   const out = [];
+  /* 发布时间 set on the draft: posted when it comes (within a tick, 5 min), outside the slots and postsPerDay.
+     More than 2 h late (the app was off) → no surprise post: it joins the normal queue instead. */
+  for (const d of drafts.list('approved').filter(x => x.form.postAt && x.form.postAt <= now)) {
+    if (pause.get()) { log(`${d.id}: own time, publishing paused`); break; }
+    if (now - d.form.postAt > 2 * 3600e3) { drafts.update(d.id, { form: { ...d.form, postAt: null } }, { from: ['approved'] }); log(`${d.id}: own time missed by > 2 h, back in the normal queue`); continue; }
+    log(`${d.id}: own time, posting`);
+    try { const r = await publishDraft(d.id, { scheduled: true }); out.push(r); log(`  → ${r.kind}${r.message ? ': ' + r.message : ''}`); }
+    catch (e) { log('  ! ' + e.message); }
+  }
   for (const s of due) {
     if (now - s.planned_at > 2 * 3600e3) { setSlot(s.id, 'skipped'); log(`slot ${s.day} ${s.label}: missed by > 2 h, skipped`); continue; }
     if (pause.get()) { log(`slot ${s.day} ${s.label}: publishing paused`); break; } // stays open until resumed or missed
