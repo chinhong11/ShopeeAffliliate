@@ -31,7 +31,7 @@ export function logView({ brand, rows, count, imgOf }) {
         ${sub ? `<code>${esc(sub)}</code>` : ''}
       </div>
       <div class="la">
-        ${r.kind === 'posted' && r.permalink ? `<a href="${esc(r.permalink)}" target="_blank" rel="noopener">查看 ↗</a>` : ''}
+        ${r.kind === 'posted' && r.permalink ? `<a href="${esc(r.permalink)}" target="_blank" rel="noopener">查看 ↗</a><a class="boost" href="${esc(r.permalink)}" target="_blank" rel="noopener" title="打开帖子后，点帖子下面的「加速推广 / Boost post」">推广 ↗</a>` : ''}
         ${r.kind === 'failed' && r.retryable ? `<button class="btn btn-ghost btn-sm" data-act="retry" data-id="${r.id}">重试</button>` : ''}
       </div>
     </div>`;
@@ -39,6 +39,7 @@ export function logView({ brand, rows, count, imgOf }) {
   const body = `
     <header class="rv-head"><div class="grow"><h1>已发布</h1><div class="hsub">每条链接都带追踪码（Shopee 报告里的 Sub ID），以后用来统计哪个模板卖得好</div></div></header>
     <div class="rv-scroll" id="scroll">
+      ${rows.some(r => r.kind === 'posted' && r.permalink) ? '<div class="hint boost-tip">想花钱推广一帖：点「推广 ↗」打开帖子，再点帖子下面的「加速推广 / Boost post」，在 Facebook 里选预算、天数和受众。</div>' : ''}
       ${groups.length ? groups.map(g => `<section><div class="lbl">${esc(g.label)}</div><div class="lgc">${g.items.map(item).join('')}</div></section>`).join('')
         : '<div class="empty" style="margin-top:8px"><b>还没有发布记录</b><p>批准的草稿会在发帖时段自动发到 Facebook 专页。</p></div>'}
       <div class="endpad"></div>

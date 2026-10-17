@@ -41,7 +41,9 @@ el('nf').onsubmit = async e => {
   const btn = el('save');
   btn.disabled = true; btn.textContent = '添加中…';
   try {
-    await api('/manual', { name: v('name'), price: v('price'), was: v('was'), rating: v('rating'), sales: v('sales'), link: v('link'), photos });
+    const body = { name: v('name'), price: v('price'), was: v('was'), rating: v('rating'), sales: v('sales'), link: v('link'), photos };
+    const r = await api('/manual', body);
+    if (r.duplicate && !(confirm(r.duplicate + '\n\n还是要加吗？') && await api('/manual', { ...body, force: true }))) { btn.disabled = false; btn.textContent = '加到待审核'; return; }
     toastNext('已加到待审核 · 海报生成中');
     location.href = '/';
   } catch (err) { btn.disabled = false; btn.textContent = '加到待审核'; toast(err.message); }

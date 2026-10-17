@@ -77,7 +77,14 @@ let collecting = !!$('#hsub.busy');
 const ACT = {
   async approve(id, btn) {
     btn.disabled = true; btn.textContent = '批准中…';
-    try { const r = await api(`/drafts/${id}/approve`, {}); await refresh(); toast(r.again ? '已保存修改' : '已批准 · ' + (r.slot || '等空位') + ' 发布'); }
+    try {
+      let r = await api(`/drafts/${id}/approve`, {});
+      if (r.confirm) {
+        if (!confirm(r.confirm)) { btn.disabled = false; btn.textContent = '批准'; return; }
+        r = await api(`/drafts/${id}/approve`, { priceOk: true });
+      }
+      await refresh(); toast(r.again ? '已保存修改' : '已批准 · ' + (r.slot || '等空位') + ' 发布');
+    }
     catch (e) { btn.disabled = false; btn.textContent = '批准'; toast(e.message); }
   },
   async skip(id) {
@@ -100,7 +107,8 @@ const ACT = {
   },
   async token(_, btn) {
     btn.disabled = true;
-    try { const r = await api('/token', {}); await refresh(); toast(r.ok ? 'Token 正常 · 已恢复发布' : (r.error || 'Token 还是不行')); }
+    const wasPaused = !!$('.alert');
+    try { const r = await api('/token', {}); await refresh(); toast(r.ok ? (wasPaused ? 'Token 正常 · 已恢复发布' : 'Facebook 正常') : (r.error || 'Token 还是不行')); }
     catch (e) { btn.disabled = false; toast(e.message); }
   },
   async retry(id, btn) {
