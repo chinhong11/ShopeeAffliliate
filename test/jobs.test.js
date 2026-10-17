@@ -118,11 +118,11 @@ test('daily jobs catch up once per day, and only on the lease holder', async () 
   svc.pause.clear(); // the token job ran without FB settings
 });
 
-test('scheduler: daily runner every minute, publishing every 5; stopping releases the lease', () => {
+test('scheduler: daily runner and publishing every minute; stopping releases the lease', () => {
   kv.del('jobsLease');
   const list = jobs.startJobs();
   const runs = list.filter(j => j.nextRun).map(j => j.nextRun() - Date.now());
-  assert.ok(runs[0] <= 60e3 && runs[1] <= 5 * 60e3);
+  assert.ok(runs[0] <= 60e3 && runs[1] <= 60e3);
   assert.ok(kv.get('jobsLease'));
   jobs.stopJobs();
   assert.equal(kv.get('jobsLease'), null);

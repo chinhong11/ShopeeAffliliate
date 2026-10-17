@@ -13,7 +13,7 @@ const graph = http.createServer((req, res) => {
   let body = '';
   req.on('data', c => body += c.toString('latin1'));
   req.on('end', () => {
-    calls.push({ url: req.url, body });
+    calls.push({ method: req.method, url: req.url, body });
     const send = j => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(j)); };
     if (req.url.includes('/photos')) return send({ id: 'ph1', post_id: 'page1_post1' });
     if (req.url.includes('/comments')) return send({ id: 'c1' });
@@ -157,4 +157,38 @@ test('发布时间: a draft with its own time skips the slots and posts when it 
   drafts.update(late.id, { form: { ...drafts.get(late.id).form, postAt: Date.now() - 3 * 3600e3 } });
   await pub.publishDue({ log: () => {} });
   assert.equal(drafts.get(late.id).form.postAt, null);
+});
+
+test('已发布 → 删除: deleted on Facebook, gone from the list and the no-repeat rule; already gone is fine', async () => {
+  const { db } = await import('../src/db.js');
+  const fb = await import('../src/facebook.js');
+  const row = db.prepare("SELECT * FROM posts WHERE kind='posted' ORDER BY id LIMIT 1").get();
+  calls.length = 0;
+  await pub.deletePosted(row.id);
+  assert.ok(calls.some(c => c.method === 'DELETE' && c.url.includes('/' + row.fb_post_id + '?')));
+  assert.equal(db.prepare('SELECT kind FROM posts WHERE id=?').get(row.id).kind, 'deleted');
+  assert.ok(!svc.logRows().some(r => r.id === row.id));
+  await assert.rejects(pub.deletePosted(row.id), /不在「已发布」/);
+  /* deleted on Facebook by hand first: Facebook says it doesn't exist, the row is still cleared */
+  const other = db.prepare("SELECT * FROM posts WHERE kind='posted' ORDER BY id LIMIT 1").get();
+  const keep = fb.opts.fetchImpl;
+  fb.opts.fetchImpl = async () => new Response(JSON.stringify({ error: { code: 100, message: 'Object with ID does not exist' } }), { status: 400 });
+  try { await pub.deletePosted(other.id); } finally { fb.opts.fetchImpl = keep; }
+  assert.equal(db.prepare('SELECT kind FROM posts WHERE id=?').get(other.id).kind, 'deleted');
+  /* code 100 but the post can still be read (the token may not delete it): kept, with a clear message */
+  const live = fresh(svc.addManual({ ...input, link: 'https://s.shopee.com.my/Del4', force: true })); // no background render
+  db.prepare("INSERT INTO posts(draft_id,item_id,kind,at,fb_post_id) VALUES(?,?,'posted',?,'p4')").run(live.id, live.itemId, Date.now());
+  const id4 = db.prepare("SELECT id FROM posts WHERE fb_post_id='p4'").get().id;
+  fb.opts.fetchImpl = async (url, o) => (o && o.method === 'DELETE')
+    ? new Response(JSON.stringify({ error: { code: 100, message: 'Unsupported delete request. Object cannot be loaded due to missing permissions' } }), { status: 400 })
+    : new Response(JSON.stringify({ id: 'p4' }), { status: 200 });
+  try { await assert.rejects(pub.deletePosted(id4), /帖子还在专页上/); } finally { fb.opts.fetchImpl = keep; }
+  assert.equal(db.prepare('SELECT kind FROM posts WHERE id=?').get(id4).kind, 'posted');
+  /* any other refusal: nothing changes */
+  const third = fresh(svc.addManual({ ...input, link: 'https://s.shopee.com.my/Del3', force: true })); // no background render
+  db.prepare("INSERT INTO posts(draft_id,item_id,kind,at,fb_post_id) VALUES(?,?,'posted',?,'p3')").run(third.id, third.itemId, Date.now());
+  const id3 = db.prepare("SELECT id FROM posts WHERE fb_post_id='p3'").get().id;
+  fb.opts.fetchImpl = async () => new Response(JSON.stringify({ error: { code: 200, message: 'Permissions error' } }), { status: 403 });
+  try { await assert.rejects(pub.deletePosted(id3), /Facebook 没让删除/); } finally { fb.opts.fetchImpl = keep; }
+  assert.equal(db.prepare('SELECT kind FROM posts WHERE id=?').get(id3).kind, 'posted');
 });

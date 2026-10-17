@@ -109,6 +109,12 @@ const ACT = {
     if (!r.started) toast('已经在抓取了');
     watch();
   },
+  async delpost(id, btn) {
+    if (!confirm('从 Facebook 专页删除这个帖子（连同评论区的链接）？删除后不能恢复。')) return;
+    btn.disabled = true; btn.textContent = '删除中…';
+    try { await api(`/posts/${id}/delete`, {}); await refresh(); toast('已从 Facebook 删除'); }
+    catch (e) { btn.disabled = false; btn.textContent = '删除'; toast(e.message); }
+  },
   async gmodel(id, btn) {
     btn.disabled = true;
     try { const r = await api('/gemini/model', { id }); await refresh(); toast('现在用 ' + r.model); }

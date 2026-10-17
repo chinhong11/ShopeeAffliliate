@@ -456,4 +456,4 @@ const reminderListeners = [];
 export const onReminder = fn => reminderListeners.push(fn);
 export const remind = r => fire(reminderListeners, r);
 
-export const logRows = (days = 30) => db.prepare('SELECT * FROM posts WHERE at>=? ORDER BY at DESC').all(Date.now() - days * 86400e3);
+export const logRows = (days = 30) => db.prepare("SELECT * FROM posts WHERE at>=? AND kind<>'deleted' ORDER BY at DESC").all(Date.now() - days * 86400e3);

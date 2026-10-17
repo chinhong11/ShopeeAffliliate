@@ -141,7 +141,7 @@ export function startJobs() {
   const opt = { timezone: tz, protect: true, catch: e => log('job error:', e.message) };
   jobs.push(
     new Cron('* * * * *', opt, () => runDailyDue()), // collect / plan / backup / token check, each once a day
-    new Cron('*/5 * * * *', opt, tick)               // due slots → publish
+    new Cron('* * * * *', opt, tick)                 // due slots and own times → publish (a running tick makes the next one skip)
   );
   const keep = setInterval(() => { if (leader) holdLease(); }, 60e3); // keep the lease fresh while we hold it
   keep.unref(); jobs.push({ stop: () => clearInterval(keep) });
@@ -149,7 +149,7 @@ export function startJobs() {
     tokenCheck().catch(e => log('token check:', e.message));
     setTimeout(() => runDailyDue().then(tick), 5000).unref();
   } else log('another instance holds the scheduler lease; jobs idle here until it stops');
-  log(`scheduled (${tz}): collect ${cfg.collectAt}, plan 00:05, publish every 5 min, backup 03:30, token check daily`);
+  log(`scheduled (${tz}): collect ${cfg.collectAt}, plan 00:05, publish every minute, backup 03:30, token check daily`);
   return jobs;
 }
 export const stopJobs = () => { jobs.forEach(j => j.stop()); jobs.length = 0; releaseLease(); };

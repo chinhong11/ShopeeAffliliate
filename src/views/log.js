@@ -31,7 +31,7 @@ export function logView({ brand, rows, count, imgOf }) {
         ${sub ? `<code>${esc(sub)}</code>` : ''}
       </div>
       <div class="la">
-        ${r.kind === 'posted' && r.permalink ? `<a href="${esc(r.permalink)}" target="_blank" rel="noopener">查看 ↗</a><a class="boost" href="${esc(r.permalink)}" target="_blank" rel="noopener" title="打开帖子后，点帖子下面的「加速推广 / Boost post」">推广 ↗</a>` : ''}
+        ${r.kind === 'posted' && r.permalink ? `<a href="${esc(r.permalink)}" target="_blank" rel="noopener">查看 ↗</a><a class="boost" href="${esc(r.permalink)}" target="_blank" rel="noopener" title="打开帖子后，点帖子下面的「加速推广 / Boost post」">推广 ↗</a><button class="btn btn-ghost btn-sm del" data-act="delpost" data-id="${r.id}">删除</button>` : ''}
         ${r.kind === 'failed' && r.retryable ? `<button class="btn btn-ghost btn-sm" data-act="retry" data-id="${r.id}">重试</button>` : ''}
       </div>
     </div>`;
