@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8">
+<title>CH Sharing Hub covers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800&family=Noto+Sans+SC:wght@500;900&display=swap" rel="stylesheet">
+<style>
+/* 820×360 canvas (exported @2x = 1640×720). Facebook shows 820×312 on desktop and ~640×360 on phones:
+   everything that matters stays inside the central 640×312 (dashed guide, hidden on export) */
+*{box-sizing:border-box;margin:0}
+body{background:#888;display:grid;gap:24px;padding:24px;justify-content:center;font-family:"Noto Sans SC",sans-serif}
+.cv{width:820px;height:360px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.safe{position:absolute;left:90px;top:24px;width:640px;height:312px;outline:1px dashed rgba(255,0,0,.5);pointer-events:none}
+.export .safe{display:none}
+.in{width:640px;text-align:center;position:relative;z-index:1}
+.kick{font:600 13px/1 "Montserrat",sans-serif;letter-spacing:.32em;text-transform:uppercase}
+h1{font:900 46px/1.15 "Noto Sans SC",sans-serif;letter-spacing:.02em;margin:16px 0 14px}
+.sub{font:500 16px/1 "Noto Sans SC",sans-serif;letter-spacing:.12em}
+.sub i{font-style:normal;display:inline-block;margin:0 .7em}
+.rule{width:44px;height:3px;border-radius:2px;margin:0 auto}
+
+/* 1 · warm cream */
+.cream{background:#fbf6ee;color:#1c1c1e}
+.cream .kick{color:#6b5f52}
+.cream h1 b{color:#d63a1c}
+.cream .rule{background:#ee4d2d;margin-top:22px}
+.cream .sub{color:#4a4038}
+
+/* 2 · dark */
+.dark{background:radial-gradient(120% 140% at 50% 0%,#221d2b 0%,#15131a 60%);color:#fff}
+.dark .kick{color:#b9b0c8}
+.dark h1 b{color:#ff7a50}
+.dark .sub{color:#d6cfe0}
+.dark .rule{background:#ff7a50;margin-bottom:22px}
+
+/* 3 · white + one orange circle */
+.white{background:#fff;color:#16141a;justify-content:center}
+.white::before{content:"";position:absolute;width:300px;height:300px;border-radius:50%;background:#ee4d2d;right:-70px;top:-90px}
+.white::after{content:"";position:absolute;width:120px;height:120px;border-radius:50%;border:3px solid #ee4d2d;left:-40px;bottom:-50px}
+.white .in{text-align:left;padding-left:20px}
+.white .kick{color:#5c5566}
+.white h1{font-size:50px}
+.white h1 b{color:#c7361a}
+.white .sub{color:#3d3845}
+.white .rule{margin:0 0 20px;background:#16141a}
+</style></head>
+<body>
+<section class="cv cream" id="minimal-cream"><div class="safe"></div><div class="in">
+  <div class="kick">CH Sharing Hub</div>
+  <h1>每天分享 <b>Shopee</b> 好物</h1>
+  <div class="sub">好价<i>·</i>好评<i>·</i>链接在评论区</div>
+  <div class="rule"></div>
+</div></section>
+
+<section class="cv dark" id="minimal-dark"><div class="safe"></div><div class="in">
+  <div class="rule"></div>
+  <div class="kick">CH Sharing Hub</div>
+  <h1>每天分享 <b>Shopee</b> 好物</h1>
+  <div class="sub">好价<i>·</i>好评<i>·</i>链接在评论区</div>
+</div></section>
+
+<section class="cv white" id="minimal-white"><div class="safe"></div><div class="in">
+  <div class="rule"></div>
+  <div class="kick">CH Sharing Hub</div>
+  <h1>每天分享<br><b>Shopee</b> 好物</h1>
+  <div class="sub">好价<i>·</i>好评<i>·</i>链接在评论区</div>
+</div></section>
+</body></html>
