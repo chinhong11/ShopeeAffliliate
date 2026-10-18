@@ -1,5 +1,5 @@
 /* 编辑草稿 */
-import { api, toast, toastNext } from '/static/app.js';
+import { api, toast, toastNext, flagSmall } from '/static/app.js';
 import { TPL, TPL_NOTE, TPL_LOCK, TPL_ORDER, LAYOUT, posterKey } from '/shared/mapping.js';
 import { suggest, availability, cap1, cap2, isPersonal } from '/shared/pick.js';
 
@@ -101,10 +101,11 @@ function renderPhotos() {
   el('phTip').textContent = n > 1 ? `${n} 张 · ${n} 张同款海报` : '1 张 · 海报';
   el('phs').innerHTML = [0, 1, 2, 3].map(i => {
     const ref = f.photos[i];
-    if (ref) return `<div class="ph on" style="background-image:url('${imgUrl(ref)}')">${i === 0 ? '<span class="tag">Shopee</span>' : `<button class="x" data-rm="${i}" aria-label="移除这张">×</button>`}</div>`;
+    if (ref) return `<div class="ph on" data-src="${imgUrl(ref)}" style="background-image:url('${imgUrl(ref)}')">${i === 0 ? '<span class="tag">Shopee</span>' : `<button class="x" data-rm="${i}" aria-label="移除这张">×</button>`}</div>`;
     if (i === n) return '<button class="ph add" id="addPh" aria-label="加照片">＋</button>';
     return '<div class="ph"></div>';
   }).join('');
+  flagSmall(el('phs'));
 }
 function syncCaptions() {
   if (!f.cap1Manual) { f.cap1 = cap1(draft(), cfg); el('c1').value = f.cap1; }

@@ -352,8 +352,8 @@
 /* t1 — white panel: headline left, paper price tag right */
 #post.t1{--fs1:64px;--fs2:34px;}
 #post.t1 #grid,#post.t1.no-bar #grid{inset:0 0 430px 0;}
-#post.t1 #band{top:650px;background:var(--panel,#fff);}
-#post.t1 #bottomBar{background:var(--panel,#fff);}
+#post.t1 #band{top:650px;background:var(--pnl,#fff);}
+#post.t1 #bottomBar{background:var(--pnl,#fff);}
 #post.t1 #caption,#post.t1.no-bar #caption{top:684px;bottom:auto;left:56px;right:400px;gap:10px;}
 #post.t1 #priceTag{top:700px;bottom:auto;right:60px;transform:rotate(3deg);box-shadow:0 10px 26px rgba(0,0,0,.14);border:2px solid #f1ece4;}
 #post.t1 #bottomBar{box-shadow:none;border-top:2px solid #f1ece4;}
@@ -361,7 +361,7 @@
 /* t2 — cream panel: one-line headline, subtitle, then the big price with the button beside it */
 #post.t2{--fs1:54px;--fs2:30px;}
 #post.t2 #grid{inset:0 0 470px 0;}
-#post.t2 #band{top:610px;background:var(--panel,#fff7ec);}
+#post.t2 #band{top:610px;background:var(--pnl,#fff7ec);}
 #post.t2 #line1{white-space:normal;}
 #post.t2 #caption{top:638px;bottom:auto;left:64px;right:64px;gap:6px;}
 #post.t2 #bigPrice{top:770px;}
@@ -373,13 +373,17 @@
 /* t6 — dark magazine panel: big headline left, price tag right */
 #post.t6c{--fs1:70px;--fs2:34px;}
 #post.t6c #grid{inset:0 0 450px 0;}
-#post.t6c #band{top:630px;background:var(--panel,#17151c);}
+#post.t6c #band{top:630px;background:var(--pnl,#17151c);}
 #post.t6c #caption{top:668px;left:64px;right:400px;gap:12px;}
 #post.t6c #line1{line-height:1.08;}
 #post.t6c #priceTag{top:684px;bottom:auto;right:60px;transform:rotate(-3deg);}
-#post.t6c #bottomBar{background:var(--panel,#17151c);backdrop-filter:none;border-top:1px solid rgba(255,255,255,.12);}
+#post.t6c #bottomBar{background:var(--pnl,#17151c);backdrop-filter:none;border-top:1px solid rgba(255,255,255,.12);}
 /* ✨ AI 设计: accent colour for price, buttons and the seal; bar text readable on the panel */
 #post.t1,#post.t2,#post.t6c{--red:var(--accent,#e8232e);}
 #post.t1 .bb-proof,#post.t2 .bb-proof,#post.t6c .bb-proof{color:var(--panelink,var(--inkk));}
 #post.t6c .bb-proof{color:var(--panelink,#fff);}
 #post.t1 .bb-proof .sold,#post.t2 .bb-proof .sold{color:var(--panelink,#6c6c6c);opacity:.85;}
+/* a small photo (post-studio-v3.js applyPhotoBox): sharp in the middle, a blurred copy of itself fills the rest */
+#photo.small,.cellphoto.small{background-image:none!important;overflow:hidden;}
+#photo.small::before,.cellphoto.small::before{content:"";position:absolute;inset:-40px;background:var(--img) center/cover no-repeat;filter:blur(28px) brightness(.88) saturate(1.1);}
+#photo.small::after,.cellphoto.small::after{content:"";position:absolute;inset:0;background:var(--img) center/var(--sw) auto no-repeat;}
