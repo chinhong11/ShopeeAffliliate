@@ -1,7 +1,7 @@
 /* ＋ 手动添加: photos resized in the browser (same as the edit page), then one POST makes the draft.
    Opened by the Shopee import bookmark (#import=…), the fields come filled and the page's photos can be picked;
    picked Shopee photos are sent as their https address and downloaded by the server. */
-import { api, toast, toastNext } from './app.js';
+import { api, toast, toastNext, flagSmall } from './app.js';
 import { grab } from './grab.js';
 
 const el = id => document.getElementById(id);
@@ -22,11 +22,12 @@ const resize = file => new Promise((res, rej) => {
 function renderPhotos() {
   el('phTip').textContent = `${photos.length} / 4`;
   el('phs').innerHTML = [0, 1, 2, 3].map(i => {
-    if (photos[i]) return `<div class="ph on" style="background-image:url('${esc(photos[i])}')">${i === 0 ? '<span class="tag">主图</span>' : ''}<button type="button" class="x" data-rm="${i}" aria-label="移除这张">×</button></div>`;
+    if (photos[i]) return `<div class="ph on" data-src="${esc(photos[i])}" style="background-image:url('${esc(photos[i])}')">${i === 0 ? '<span class="tag">主图</span>' : ''}<button type="button" class="x" data-rm="${i}" aria-label="移除这张">×</button></div>`;
     if (i === photos.length) return '<button type="button" class="ph add" id="addPh" aria-label="加照片">＋</button>';
     return '<div class="ph"></div>';
   }).join('');
   if (imp) renderPick();
+  flagSmall(el('phs'));
 }
 
 el('phs').onclick = e => {
@@ -53,8 +54,9 @@ const imp = (() => {
 function renderPick() {
   el('pick').innerHTML = imp.images.map(u => {
     const i = photos.indexOf(u);
-    return `<button type="button" class="ph on${i >= 0 ? ' sel' : ''}" data-pick="${esc(u)}" style="background-image:url('${esc(u)}')" aria-pressed="${i >= 0}" aria-label="${i >= 0 ? `第 ${i + 1} 张，点一下取消` : '选这张'}">${i >= 0 ? `<span class="n">${i + 1}</span>` : ''}</button>`;
+    return `<button type="button" class="ph on${i >= 0 ? ' sel' : ''}" data-pick="${esc(u)}" data-src="${esc(u)}" style="background-image:url('${esc(u)}')" aria-pressed="${i >= 0}" aria-label="${i >= 0 ? `第 ${i + 1} 张，点一下取消` : '选这张'}">${i >= 0 ? `<span class="n">${i + 1}</span>` : ''}</button>`;
   }).join('');
+  flagSmall(el('pick'));
 }
 if (imp) {
   const str = v => typeof v === 'string' || typeof v === 'number' ? String(v) : '';

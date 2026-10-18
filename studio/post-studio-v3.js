@@ -133,6 +133,12 @@ function applyPhotoBox(el,o){
   const coverW=Math.max(100,(chh/cw)*(o.iw/o.ih)*100);
   el.style.backgroundSize=(coverW*o.zoom/100)+'% auto';
   el.style.backgroundPosition=`${o.x}% ${o.y}%`;
+  /* a photo the export (2× this size) would enlarge more than 2.5× is not stretched: it is shown at most 1.25 CSS px per
+     photo px, centred on a blurred copy of itself (studio-canvas-v3.css .small); a zoomed photo is left as set */
+  const big=coverW/100*cw*2/(o.iw||1)>2.5&&o.zoom===100&&o.iw>0;
+  el.classList.toggle('small',big);
+  if(big){el.style.setProperty('--img',`url(${o.img})`);el.style.setProperty('--sw',Math.min(o.iw*1.25,cw,chh*o.iw/o.ih)+'px');}
+  else{el.style.removeProperty('--img');el.style.removeProperty('--sw');}
 }
 function applyPhotos(){
   applyPhotoBox(photoEl,state.tpl==='t8'?state.set.pages[state.set.active]:state.photos[0]);
@@ -220,7 +226,7 @@ function applyVars(){
   post.style.setProperty('--badgec',state.badgec);
   post.style.setProperty('--postbg',state.bg);
   /* ✨ AI 设计 (from the app): panel colour, accent (price, buttons, seal), white text on a dark panel; '' = the template's own */
-  for(const [v,k] of [['--panel','panel'],['--accent','accent'],['--panelink','panelInk']])state[k]?post.style.setProperty(v,state[k]):post.style.removeProperty(v);
+  for(const [v,k] of [['--pnl','panel'],['--accent','accent'],['--panelink','panelInk']])state[k]?post.style.setProperty(v,state[k]):post.style.removeProperty(v);
   post.style.setProperty('--titlefont',state.font+',sans-serif');
   post.style.setProperty('--burst','polygon(50% 0%,60% 12%,74% 4%,78% 19%,94% 17%,90% 32%,100% 40%,89% 50%,100% 60%,90% 68%,94% 83%,78% 81%,74% 96%,60% 88%,50% 100%,40% 88%,26% 96%,22% 81%,6% 83%,10% 68%,0% 60%,11% 50%,0% 40%,10% 32%,6% 17%,22% 19%,26% 4%,40% 12%)');
   cls('mk',state.hl);

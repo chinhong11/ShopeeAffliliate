@@ -8,6 +8,22 @@ export const api = async (url, body) => {
   return j;
 };
 
+/* photo tiles with data-src: a photo under 800 px on its short side gets a badge (posters are 2160 px; the poster
+   frames such a photo instead of stretching it, but a bigger photo is still sharper) */
+export const SMALL_PX = 800;
+export function flagSmall(root = document) {
+  for (const el of root.querySelectorAll('[data-src]')) {
+    if (el.dataset.sized === el.dataset.src) continue;
+    el.dataset.sized = el.dataset.src;
+    const im = new Image();
+    im.onload = () => {
+      const w = im.naturalWidth, h = im.naturalHeight;
+      if (Math.min(w, h) < SMALL_PX && !el.querySelector('.lowres')) el.insertAdjacentHTML('beforeend', `<span class="lowres" title="这张照片只有 ${w}×${h}，海报会有点糊；有更大的照片就换一张">${Math.min(w, h)}px 会糊</span>`);
+    };
+    im.src = el.dataset.src;
+  }
+}
+
 /* layout class follows the window (phone < 900px ≤ desktop) */
 const rv = $('#rv');
 const fit = () => { const desk = innerWidth >= 900; rv.classList.toggle('desk', desk); rv.classList.toggle('phone', !desk); };

@@ -81,6 +81,9 @@ body{background:var(--bg);-webkit-tap-highlight-color:transparent}
 .ai-cap{width:100%;min-height:46px;margin-bottom:14px;border-color:#6d5bd0;color:#d9d2ff}
 .skp .qrow{gap:8px}
 .skp .btn.del{color:#ff8a9b}
+/* photo tiles: 会糊 badge (app.js flagSmall) */
+.ph .lowres{position:absolute;left:4px;right:4px;bottom:4px;padding:3px 4px;border-radius:5px;background:#d90f38;color:#fff;font-size:11px;font-weight:900;line-height:1.1;text-align:center;pointer-events:none}
+.ph.on .tag + .lowres,.ph .tag ~ .lowres{bottom:24px}
 /* the last Facebook token check, above the posting times */
 .fbst{display:flex;align-items:center;gap:12px;margin:0 16px 12px;font-size:13px;font-weight:700;color:var(--okt)}
 .fbst.warn{color:var(--warnt)}

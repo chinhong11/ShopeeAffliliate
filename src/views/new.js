@@ -23,7 +23,7 @@ export function newView({ brand, count }) {
         <div class="sec-h"><span class="ic">📷</span><h2>照片</h2><span class="tip" id="phTip">0 / 4</span></div>
         <div class="phs" id="phs"></div>
         <input id="file" type="file" accept="image/*" multiple hidden>
-        <div class="hint">从 Shopee 下载的商品图。第 1 张是主图，最多 4 张。</div>
+        <div class="hint">从 Shopee 下载的商品图。第 1 张是主图，最多 4 张。短边少于 800px 的照片会标「会糊」：海报会把它放在中间、不硬拉大，但能换大一点的照片最好（用 📥 一键导入拿 Shopee 原图）。</div>
       </section>
       <section class="sec">
         <div class="sec-h"><span class="ic">🛍️</span><h2>商品</h2></div>

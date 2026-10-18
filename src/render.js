@@ -180,7 +180,7 @@ async function renderNow(state, { set = false } = {}) {
     await trimFonts(page, state);
     await page.evaluate(() => window.PostStudio.fit && window.PostStudio.fit()); // headline / price sizes with the final fonts
     const pngUrl = await page.evaluate(() => window.PostStudio.exportPng());
-    let png = toBuf(pngUrl);
+    const png = toBuf(pngUrl);
     /* JPEGs for the review app: 540px for the cards, 1080px for the edit page (a fraction of the PNG's size on a phone) */
     const jpeg = (size, q = 0.85) => page.evaluate(async ([u, s, q]) => {
       const i = new Image(); await new Promise((r, j) => { i.onload = r; i.onerror = j; i.src = u; });
@@ -188,11 +188,11 @@ async function renderNow(state, { set = false } = {}) {
       return c.toDataURL('image/jpeg', q);
     }, [pngUrl, size, q]).then(toBuf);
     /* a photo-heavy 2160px PNG can pass Facebook's upload size: post a 92 % JPEG of the same size instead */
-    if (png.length > 3.8e6) png = await jpeg(2160, 0.92);
+    const post = png.length > 3.8e6 ? await jpeg(2160, 0.92) : png;
     const thumb = await jpeg(540), view = await jpeg(1080);
     const pages = set ? (await page.evaluate(() => window.PostStudio.exportSet())).map(toBuf) : null;
     const caption = await page.evaluate(() => window.PostStudio.caption());
-    return { png, thumb, view, set: pages, caption };
+    return { png, post, thumb, view, set: pages, caption };
   })();
   work.catch(() => {});
   try {
@@ -236,9 +236,9 @@ export const renderDraft = id => exclusive(async () => {
     const r = await renderNow(st, { set: d.form.tpl === 't8' });
     /* more than one photo (not the carousel): the same design again on each of the others → {id}-2..4.png, {id}-1 = the first */
     const more = d.form.tpl === 't8' ? [] : st.photos.slice(1);
-    const pages = r.set || (more.length ? [r.png] : null), views = more.length ? [r.view] : [];
-    for (const ph of more) { const x = await renderNow({ ...st, photos: [ph] }); pages.push(x.png); views.push(x.view); }
-    writeAtomic(posterFile(id), r.set ? r.set[0] : r.png);
+    const pages = r.set || (more.length ? [r.post] : null), views = more.length ? [r.view] : [];
+    for (const ph of more) { const x = await renderNow({ ...st, photos: [ph] }); pages.push(x.post); views.push(x.view); }
+    writeAtomic(posterFile(id), r.set ? r.set[0] : r.post);
     writeAtomic(thumbFile(id), r.thumb);
     writeAtomic(viewFile(id), r.view);
     if (pages) pages.forEach((b, i) => writeAtomic(posterFile(id, i + 1), b));
