@@ -15,6 +15,7 @@ export function contentView({ brand, count, kind, list, lang, b, ai, paused, tag
   const field = (id, label, max, soft = '') => `<div class="field"><label for="${id}">${label}${soft ? ` <span class="soft">${soft}</span>` : ''}</label><input id="${id}" type="text" maxlength="${max}"></div>`;
   const area = (id, label, rows, max, soft = '') => `<div class="field"><label for="${id}">${label}${soft ? ` <span class="soft">${soft}</span>` : ''}</label><textarea id="${id}" rows="${rows}" maxlength="${max}"></textarea></div>`;
   const drafts = list.filter(c => c.status !== 'posted'), posted = list.filter(c => c.status === 'posted');
+  const when = t => esc(zhDate(t) + ' ' + fmtTime(t));
   const line = c => esc(tip ? c.data.title : `${c.data.top} / ${c.data.bottom}`) || '<span class="soft">（还没写）</span>';
   const body = `
     <header class="rv-head"><div class="grow"><h1>${name}</h1><div class="hsub">${INTRO[kind]}先看预览，满意了再生成海报，最后自己决定发不发。</div></div></header>
@@ -48,18 +49,20 @@ export function contentView({ brand, count, kind, list, lang, b, ai, paused, tag
           <div class="when"><button type="button" class="btn btn-primary" id="make">生成海报</button><button type="button" class="btn btn-ghost" id="del" hidden>删除</button></div>
           <div class="bp-out" id="out" hidden><img id="outImg" alt="生成的海报">
             <div class="when"><button type="button" class="btn btn-primary" id="post">发布到 Facebook</button><a class="btn btn-ghost" id="outDl" download>⬇ 下载</a></div>
-            <div class="hint">${paused ? '<b>发帖暂停中</b>（看「待审核」顶部的提示），处理好了才能发。' : '马上发到专页，不占每天的发帖时段，也不算在每天几帖里。'}</div>
+            <div class="field ct-at"><label for="at">或者定时发布 <span class="soft">到时间自动发</span></label><div class="when"><input id="at" type="datetime-local"><button type="button" class="btn btn-ghost" id="schedule">定时</button></div></div>
+            <div class="hint">${paused ? '<b>发帖暂停中</b>（看「待审核」顶部的提示），处理好了才能发。' : '马上发，或定一个时间自动发。都不占每天的发帖时段，也不算在每天几帖里。'}</div>
           </div>
         </section>
         <section class="sec">
           <div class="sec-h"><span class="ic">🗂️</span><h2>草稿</h2></div>
           ${drafts.length ? `<ul class="ct-list">${drafts.map(c => c.stuck ? `<li><div class="ct-row ct-stuck"><b>${line(c)}</b><span>发到一半中断了（App 重启或断线），可能已经发出去了。先到专页看看：</span><div class="when"><button type="button" class="btn btn-ghost btn-sm" data-resolve="${c.id}" data-posted="1">已经发了</button><button type="button" class="btn btn-ghost btn-sm" data-resolve="${c.id}" data-posted="">没发，退回草稿</button></div></div></li>`
+    : c.status === 'scheduled' ? `<li><div class="ct-row"><b>${line(c)}</b><span>⏰ ${when(c.scheduledAt)} 自动发 · ${esc(LANGS[c.data.lang])}</span><div class="when"><button type="button" class="btn btn-ghost btn-sm" data-unschedule="${c.id}">取消定时（退回草稿）</button></div></div></li>`
     : c.status === 'posting' ? `<li><div class="ct-row"><b>${line(c)}</b><span>发布中…</span></div></li>`
     : `<li><button type="button" class="ct-row" data-open="${c.id}"><b>${line(c)}</b><span>${esc(LANGS[c.data.lang])}${c.error ? ' · 上次没发成' : ''}</span></button></li>`).join('')}</ul>` : '<div class="hint">还没有草稿。</div>'}
         </section>
         <section class="sec">
           <div class="sec-h"><span class="ic">✅</span><h2>已发布</h2></div>
-          ${posted.length ? `<ul class="ct-list">${posted.map(c => `<li><div class="ct-row"><b>${line(c)}</b><span>${esc(zhDate(c.postedAt) + ' ' + fmtTime(c.postedAt))}${c.permalink ? ` · <a href="${esc(c.permalink)}" target="_blank" rel="noopener">看帖子</a>` : ''}</span></div></li>`).join('')}</ul>` : '<div class="hint">还没有发过。</div>'}
+          ${posted.length ? `<ul class="ct-list">${posted.map(c => `<li><div class="ct-row"><b>${line(c)}</b><span>${when(c.postedAt)}${c.permalink ? ` · <a href="${esc(c.permalink)}" target="_blank" rel="noopener">看帖子</a>` : ''}</span></div></li>`).join('')}</ul>` : '<div class="hint">还没有发过。</div>'}
         </section>
       </div>
     </div><div class="endpad"></div></div>`;

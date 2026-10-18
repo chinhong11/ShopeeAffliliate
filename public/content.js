@@ -68,6 +68,8 @@ document.addEventListener('click', e => {
   if (l) { o.lang = l.dataset.lang; stale(); render(); }
   const st = e.target.closest('[data-style]');
   if (st) { o.style = st.dataset.style; stale(); render(); }
+  const un = e.target.closest('[data-unschedule]');
+  if (un) api(`/content/${un.dataset.unschedule}/unschedule`, {}).then(() => location.reload(), err => toast(err.message));
   const rs = e.target.closest('[data-resolve]');
   if (rs && confirm(rs.dataset.posted ? '确定已经在专页上看到这一帖了？' : '确定专页上没有这一帖？退回草稿后可以再发。')) {
     api(`/content/${rs.dataset.resolve}/resolve`, { posted: !!rs.dataset.posted }).then(() => location.reload(), err => toast(err.message));
@@ -126,6 +128,18 @@ el('post').onclick = async () => {
     toast('已发布 ✅');
     setTimeout(() => location.reload(), 900);
   } catch (err) { el('err').textContent = err.message; el('err').hidden = false; toast(err.message); done(); }
+};
+/* 定时发布: the time picked on this device, as an instant */
+el('schedule').onclick = async () => {
+  const at = new Date(el('at').value).getTime();
+  if (!made) return;
+  if (!at) return toast('先选日期和时间');
+  const done = busy(el('schedule'), '定时中…');
+  try {
+    await api(`/content/${id}/schedule`, { at });
+    toast('已定时 ⏰');
+    setTimeout(() => location.reload(), 900);
+  } catch (err) { toast(err.message); done(); }
 };
 el('del').onclick = async () => {
   if (!id || !confirm('删除这个草稿？')) return;

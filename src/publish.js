@@ -15,6 +15,7 @@ import { planDay, upcoming } from './slots.js';
 const events = [];
 export const onPublishEvent = fn => events.push(fn);
 const emit = (type, data) => events.forEach(fn => Promise.resolve().then(() => fn(type, data)).catch(e => console.error('event', e.message)));
+export const notify = emit; // 定时发布 of 贴士 / 梗图 (jobs.js) tells Telegram the same way
 
 const logPost = r => db.prepare(`INSERT INTO posts(draft_id,item_id,kind,at,slot_id,name,tpl,strategy,layout,sub_ids,fb_post_id,permalink,comment_id,message,payload)
   VALUES(@draft_id,@item_id,@kind,@at,@slot_id,@name,@tpl,@strategy,@layout,@sub_ids,@fb_post_id,@permalink,@comment_id,@message,@payload)`)
@@ -24,7 +25,7 @@ const setSlot = (slotId, status, draftId = null) => slotId && db.prepare('UPDATE
 /* atomic: only one publisher (scheduler, CLI) gets a slot */
 const claimSlot = slotId => db.prepare("UPDATE slots SET status='posting' WHERE id=? AND status='open'").run(slotId).changes > 0;
 /* posts today that count toward postsPerDay: not those at a draft's own 发布时间 (they sit outside the slots, RUNNING.md) */
-export const postedToday = () => db.prepare("SELECT COUNT(*) n FROM posts p LEFT JOIN drafts d ON d.id=p.draft_id WHERE p.kind='posted' AND p.at>=? AND json_extract(d.form, '$.postAt') IS NULL").get(new Date(dayStr() + 'T00:00:00').getTime()).n;
+export const postedToday = () => db.prepare("SELECT COUNT(*) n FROM posts p LEFT JOIN drafts d ON d.id=p.draft_id WHERE p.kind='posted' AND p.at>=? AND json_extract(d.form, '$.postAt') IS NULL AND IFNULL(p.strategy, '')<>'content'").get(new Date(dayStr() + 'T00:00:00').getTime()).n;
 /* marks a posted row whose first comment was still on its way; recoverInterrupted() rewrites it after a crash */
 const COMMENT_PENDING = '正在发第一条评论…';
 
@@ -199,6 +200,7 @@ export async function deletePosted(rowId) {
     }
   }
   db.prepare("UPDATE posts SET kind='deleted' WHERE id=?").run(rowId);
+  if (r.strategy === 'content') db.prepare("UPDATE content SET status='deleted' WHERE id=?").run(Number(r.draft_id.slice(1)));
   return { ok: true };
 }
 

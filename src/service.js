@@ -10,7 +10,7 @@ import { posterKey, studioState, TPL, endAtFrom, WORDS, langOf, rm, tagsOf } fro
 import { refreshCaptions, refreshHeadline, swapNumbers, availability, isPersonal, suggest } from './pick.js';
 import { renderDraft, renderState, photoDataUrl, posterFile, thumbFile, renderHtml } from './render.js';
 import * as fb from './facebook.js';
-import { KINDS, SIZE as CONTENT_SIZE, cleanContent, contentHtml, missing } from './content.js';
+import { KINDS, SIZE as CONTENT_SIZE, cleanContent, contentHtml, missing, titleOf } from './content.js';
 import { upcoming, dayWord, fmtTime } from './slots.js';
 import { collect } from './collect.js';
 import * as gemini from './gemini.js';
@@ -466,11 +466,11 @@ export const logRows = (days = 30) => db.prepare("SELECT * FROM posts WHERE at>=
 
 /* ---------- 贴士 / 梗图: written (or picked from Gemini's ideas) on their own tabs, posted only when the person taps 发布 ---------- */
 const kindOf = k => { if (!KINDS[k]) throw new Error('不认识的类型'); return k; };
-const crow = r => r && { id: r.id, kind: r.kind, status: r.status, stuck: r.status === 'posting' && !contentPosting.has(r.id), data: JSON.parse(r.data), postId: r.fb_post_id, permalink: r.permalink, error: r.error, createdAt: r.created_at, postedAt: r.posted_at };
+const crow = r => r && { id: r.id, kind: r.kind, status: r.status, stuck: r.status === 'posting' && !contentPosting.has(r.id), data: JSON.parse(r.data), postId: r.fb_post_id, permalink: r.permalink, error: r.error, createdAt: r.created_at, postedAt: r.posted_at, scheduledAt: r.scheduled_at };
 /* ids being posted by this process: a 'posting' row not in here was cut off (crash or restart) and needs the person to say what happened */
 const contentPosting = new Set();
 export const getContent = id => crow(db.prepare('SELECT * FROM content WHERE id=?').get(Number(id)));
-export const listContent = kind => db.prepare("SELECT * FROM content WHERE kind=? ORDER BY status='posted', COALESCE(posted_at, updated_at) DESC LIMIT 60").all(kindOf(kind)).map(crow);
+export const listContent = kind => db.prepare("SELECT * FROM content WHERE kind=? AND status<>'deleted' ORDER BY status='posted', COALESCE(posted_at, updated_at) DESC LIMIT 60").all(kindOf(kind)).map(crow);
 const cleanFor = (kind, o) => cleanContent(kind, o, loadConfig().brand);
 export function newContent(kind, o) {
   const now = Date.now();
@@ -488,7 +488,7 @@ export function deleteContent(id) {
   if (c.data.photo) fs.rmSync(path.join(dirs.img, c.data.photo), { force: true });
 }
 /* a photo meme's picture (data:image URL, already resized in the browser) → its file name.
-   shortcut: a photo replaced before saving stays on disk; add a sweep if the img folder ever grows big */
+   One replaced or never saved is removed by the daily cleanup (jobs.js cleanupFiles) */
 export const saveContentPhoto = dataUrl => writePhoto('ct-' + crypto.randomBytes(6).toString('hex'), dataUrl);
 export function contentPng(id) {
   const c = getContent(id);
@@ -498,7 +498,7 @@ export function contentPng(id) {
 export async function contentIdeas(kind, lang) {
   /* the last 30 written, so Gemini doesn't suggest the same thing again */
   const recent = db.prepare('SELECT data FROM content WHERE kind=? ORDER BY id DESC LIMIT 30').all(kindOf(kind))
-    .map(r => { const d = JSON.parse(r.data); return kind === 'tip' ? d.title : [d.top, d.bottom].filter(Boolean).join(' / '); }).filter(Boolean);
+    .map(r => titleOf(kind, JSON.parse(r.data))).filter(Boolean);
   return (await gemini.contentIdeas(kind, lang === 'ms' ? 'ms' : 'zh', fetch, recent)).map(o => cleanFor(kind, { ...o, lang }));
 }
 /* 发布: right away, not in the daily slots and not counted in postsPerDay */
@@ -509,7 +509,7 @@ export async function postContent(id) {
   if (missing(c.kind, c.data)) throw new Error(missing(c.kind, c.data));
   const png = await contentPng(id);
   /* claim it: a second tap (or another tab) can't post it twice */
-  if (!db.prepare("UPDATE content SET status='posting', error=NULL WHERE id=? AND status='draft'").run(c.id).changes) throw new Error('这一帖已经在发或发过了，刷新看看');
+  if (!db.prepare("UPDATE content SET status='posting', error=NULL WHERE id=? AND status IN ('draft','scheduled')").run(c.id).changes) throw new Error('这一帖已经在发或发过了，刷新看看');
   contentPosting.add(c.id);
   let post;
   try { post = await fb.postPhoto(png, contentMessage(c.data)); }
@@ -524,9 +524,31 @@ export async function postContent(id) {
   const postId = post.post_id || post.id;
   db.prepare("UPDATE content SET status='posted', fb_post_id=?, posted_at=? WHERE id=?").run(postId, Date.now(), c.id); // recorded first: never a second post
   contentPosting.delete(c.id);
-  db.prepare('UPDATE content SET permalink=? WHERE id=?').run(await fb.permalink(postId), c.id);
+  fs.writeFileSync(contentFile(c.id), png); // the picture on 已发布
+  const link = await fb.permalink(postId);
+  db.prepare('UPDATE content SET permalink=? WHERE id=?').run(link, c.id);
+  logContentPost(c, postId, link);
   return getContent(id);
 }
+export const contentFile = id => path.join(dirs.out, `c${id}.png`);
+/* a row on 已发布 and in 数据 (strategy 'content': not a product, not counted in postsPerDay) */
+const logContentPost = (c, postId = null, link = null) => db.prepare(`INSERT INTO posts(draft_id,item_id,kind,at,name,tpl,strategy,layout,fb_post_id,permalink)
+  VALUES(?,'','posted',?,?,?,'content',1,?,?)`).run('c' + c.id, Date.now(), titleOf(c.kind, c.data), c.kind, postId, link);
+/* 定时发布: at a time the person picks, outside the daily slots (jobs.js posts it when due) */
+export function scheduleContent(id, at, now = Date.now()) {
+  const c = getContent(id);
+  if (!c) throw new Error('这一帖不存在');
+  if (missing(c.kind, c.data)) throw new Error(missing(c.kind, c.data));
+  at = Number(at);
+  if (!(at > now + 60e3 && at < now + 30 * 86400e3)) throw new Error('时间要在现在之后，30 天以内');
+  if (!db.prepare("UPDATE content SET status='scheduled', scheduled_at=?, error=NULL, updated_at=? WHERE id=? AND status='draft'").run(at, now, c.id).changes) throw new Error('这一帖已经定时、在发或发过了，刷新看看');
+  return getContent(id);
+}
+export function unscheduleContent(id) {
+  if (!db.prepare("UPDATE content SET status='draft', scheduled_at=NULL, updated_at=? WHERE id=? AND status='scheduled'").run(Date.now(), Number(id)).changes) throw new Error('这一帖没有在定时，刷新看看');
+  return getContent(id);
+}
+export const dueContent = (now = Date.now()) => db.prepare("SELECT * FROM content WHERE status='scheduled' AND scheduled_at<=? ORDER BY scheduled_at").all(now).map(crow);
 /* the caption + contentHashtags (or hashtags) for the post's language, unless the caption already ends with them */
 export function contentMessage(d, cfg = loadConfig()) {
   const tags = tagsOf({ hashtags: cfg.contentHashtags ?? cfg.hashtags }, d.lang).trim();
@@ -538,5 +560,6 @@ export function resolveContent(id, posted) {
   if (!c || !c.stuck) throw new Error('这一帖不是「不确定有没有发」的状态，刷新看看');
   db.prepare(`UPDATE content SET status=?, posted_at=?, error=?, updated_at=? WHERE id=? AND status='posting'`)
     .run(posted ? 'posted' : 'draft', posted ? Date.now() : null, posted ? null : '上次发到一半中断了（你确认了没有发出去）', Date.now(), c.id);
+  if (posted) logContentPost(c);
   return getContent(id);
 }

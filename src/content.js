@@ -20,6 +20,8 @@ export function cleanContent(kind, o, b = {}) {
   const points = (Array.isArray(o.points) ? o.points : String(o.points || '').split('\n')).map(p => str(p, 70)).filter(Boolean).slice(0, 5);
   return { ...base, title: str(o.title, 50), points };
 }
+/* one line naming the post (lists, 已发布, Telegram, the ideas Gemini must not repeat) */
+export const titleOf = (kind, c) => kind === 'tip' ? c.title || '' : [c.top, c.bottom].filter(Boolean).join(' / ');
 /* what is still missing before it can be posted ('' = ready) */
 export const missing = (kind, c) => kind === 'tip' ? (c.title && c.points.length ? '' : '标题和至少一条贴士都要写')
   : c.style === 'photo' ? (c.photo && (c.top || c.bottom) ? '' : '要有照片和至少一行字') : (c.top && c.bottom ? '' : '上下两行都要写');

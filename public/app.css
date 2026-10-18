@@ -194,3 +194,5 @@ button.ct-row{cursor:pointer}
 .ct-stuck .when{margin-top:6px}
 [hidden]{display:none!important} /* a display rule (e.g. .bp-out{display:flex}) must not undo the hidden attribute */
 .bp-form .hint+.field{margin-top:14px}
+.ct-at{margin-top:6px}
+.ct-at input{width:auto;min-height:44px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:var(--r-sm);padding:8px 12px;font:inherit;color-scheme:dark}

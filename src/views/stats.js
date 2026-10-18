@@ -4,7 +4,7 @@ import { rm } from '../mapping.js';
 import { fmtTime } from '../slots.js';
 
 /* Gemini usage as counted by the app; Google's own limits are only on AI Studio */
-const KIND = { caption: '写文案', design: '自动设计', designs: '4 款设计' };
+const KIND = { caption: '写文案', design: '自动设计', designs: '4 款设计', tip: '贴士点子', meme: '梗图点子' };
 function gemBox(g) {
   if (!g || !g.on) return '';
   const t = g.today, l = g.lastLimit, k = Object.entries(t.kinds || {}).map(([x, n]) => `${KIND[x] || x} ${n}`).join(' · ');
@@ -50,6 +50,7 @@ export function statsView({ brand, range, s, count, gem = null }) {
       </div>
       <div class="lbl">按策略</div>${bars(s.strat, true)}
       <div class="lbl">按模板</div>${bars(s.tpl, false)}
+      <div class="lbl">贴士 / 梗图 <span class="soft">已算在帖子数里，不带购买链接，没有佣金</span></div><div class="bars"><div class="br"><div class="bl"><span class="bo">贴士 ${s.content.tip} 帖 · 梗图 ${s.content.meme} 帖</span></div></div></div>
       ${gemBox(gem)}
       <div class="endpad"></div>
     </div>`;

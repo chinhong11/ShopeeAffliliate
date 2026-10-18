@@ -150,3 +150,48 @@ test('ideas are told what was already written; hashtags go at the end of the pos
   assert.equal(svc.contentMessage(d, { hashtags: '#shopee', contentHashtags: '' }), 'Cuba ni');
   assert.equal(svc.contentMessage({ caption: 'x #tipsharian', lang: 'ms' }, { contentHashtags: '#tipsharian' }), 'x #tipsharian');
 });
+
+test('定时发布: checked, posted by the job when due (not while paused), then on 已发布 and in 数据, not in postsPerDay', async () => {
+  const jobs = await import('../src/jobs.js');
+  const publish = await import('../src/publish.js');
+  const { item } = await post('/content', { kind: 'tip', data: { title: 'Jimat air', points: ['Tutup paip'], caption: 'Cuba', lang: 'ms' } });
+  assert.match((await post(`/content/${item.id}/schedule`, { at: Date.now() - 1000 })).error, /现在之后/);
+  const { item: empty } = await post('/content', { kind: 'meme', data: {} });
+  assert.match((await post(`/content/${empty.id}/schedule`, { at: Date.now() + 3600e3 })).error, /上下两行/);
+  const at = Date.now() + 3600e3;
+  assert.equal((await post(`/content/${item.id}/schedule`, { at })).item.status, 'scheduled');
+  assert.match((await post(`/content/${item.id}`, { data: { title: 'x' } })).error, /已经发了/); // locked while scheduled
+  assert.ok((await (await get('/tips')).text()).includes('自动发'));
+  assert.equal((await post(`/content/${item.id}/unschedule`, {})).item.status, 'draft');
+  await post(`/content/${item.id}/schedule`, { at });
+
+  const before = fbs.calls.length, today = publish.postedToday();
+  assert.equal(await jobs.postContentDue(at - 60e3), 0); // not yet
+  svc.pause.set(4, 'x');
+  assert.equal(await jobs.postContentDue(at + 1), 0); // paused: waits
+  svc.pause.clear();
+  assert.equal(await jobs.postContentDue(at + 1), 1);
+  assert.equal(fbs.calls.length - before, 2); // the photo post + its permalink
+  assert.equal(svc.getContent(item.id).status, 'posted');
+  assert.equal(publish.postedToday(), today);
+
+  const log = await (await get('/log')).text();
+  assert.ok(log.includes('Jimat air') && log.includes(`/posters/c${item.id}.png`));
+  assert.equal((await get(`/posters/c${item.id}.png`)).status, 200);
+  assert.ok((await (await get('/stats')).text()).includes('贴士 '));
+  const { db } = await import('../src/db.js');
+  const row = db.prepare("SELECT id FROM posts WHERE draft_id=?").get('c' + item.id);
+  assert.equal((await post(`/posts/${row.id}/delete`, {})).status, 200);
+  assert.equal(svc.getContent(item.id).status, 'deleted');
+  assert.ok(!(await (await get('/tips')).text()).includes('Jimat air'));
+});
+
+test('cleanup keeps a saved meme photo and removes one nobody uses', async () => {
+  const { cleanupFiles } = await import('../src/jobs.js');
+  const dataUrl = 'data:image/png;base64,' + fs.readFileSync(new URL('../public/icon-192.png', import.meta.url)).toString('base64');
+  const used = (await post('/content/photo', { dataUrl })).photo, orphan = (await post('/content/photo', { dataUrl })).photo;
+  await post('/content', { kind: 'meme', data: { style: 'photo', photo: used, top: 'a' } });
+  cleanupFiles(Date.now() + 2 * 86400e3);
+  assert.ok(fs.existsSync(path.join(tmp, 'img', used)));
+  assert.ok(!fs.existsSync(path.join(tmp, 'img', orphan)));
+});

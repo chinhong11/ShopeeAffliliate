@@ -6,9 +6,10 @@ import { Cron } from 'croner';
 import { loadConfig, dirs } from './config.js';
 import { db, kv, dayStr } from './db.js';
 import { planDay, toMin, hhmm } from './slots.js';
-import { publishDue, recoverInterrupted } from './publish.js';
+import { publishDue, recoverInterrupted, notify } from './publish.js';
 import { checkToken } from './facebook.js';
-import { runCollect, pause, pauseText, fbWords, EXPIRE_MS, approvedWithSlots, remind } from './service.js';
+import { runCollect, pause, pauseText, fbWords, EXPIRE_MS, approvedWithSlots, remind, dueContent, postContent } from './service.js';
+import { titleOf } from './content.js';
 import { backup } from './backup.js';
 import { ready as shopeeReady } from './shopee.js';
 
@@ -37,7 +38,21 @@ export async function tick() {
   try { await publishDue({ log }); }
   catch (e) { log('publishDue failed:', e.message); }
   try { remindDue(); } catch (e) { log('reminder failed:', e.message); }
+  try { await postContentDue(); } catch (e) { log('postContentDue failed:', e.message); }
   busy = false;
+}
+
+/* 贴士 / 梗图 with a 定时发布 time: posted when due. While posting is paused they wait (and go out late, once it's lifted);
+   a failure puts the post back in 草稿 with the reason, and Telegram says so */
+export async function postContentDue(now = Date.now()) {
+  if (pause.get()) return 0;
+  const due = dueContent(now);
+  for (const c of due) {
+    const d = { p: { name: (c.kind === 'tip' ? '贴士 · ' : '梗图 · ') + titleOf(c.kind, c.data) } };
+    try { const p = await postContent(c.id); log(`content ${c.id} posted`); notify('posted', { d, permalink: p.permalink }); }
+    catch (e) { log(`content ${c.id} failed:`, e.message); notify('failed', { d, message: e.message + '\n（已退回草稿，到贴士 / 梗图页再发）' }); }
+  }
+  return due.length;
 }
 
 /* an hour before a posting time that nothing approved will fill, while drafts are waiting: remind once */
@@ -69,6 +84,13 @@ export function expireDrafts(now = Date.now()) {
    shows 30 days). Without this a 1 GB volume fills up in about four months. Live drafts keep everything. */
 export function cleanupFiles(now = Date.now()) {
   const keepAll = new Set(), keepThumb = new Set(), keepImg = new Set();
+  /* 贴士 / 梗图: a photo while its post is kept (a replaced or never-saved upload goes), the 已发布 picture for 30 days */
+  for (const r of db.prepare('SELECT id, status, data, posted_at FROM content').all()) {
+    if (r.status !== 'deleted' && !(r.posted_at && r.posted_at < now - 30 * 86400e3)) { // drafts have no posted_at
+      keepThumb.add('c' + r.id);
+      try { const p = JSON.parse(r.data).photo; if (p) keepImg.add(p); } catch {}
+    }
+  }
   for (const r of db.prepare('SELECT id, status, form, updated_at FROM drafts').all()) {
     const live = ['draft', 'approved', 'posting', 'failed'].includes(r.status);
     if (live || r.updated_at >= now - 2 * 86400e3) keepAll.add(r.id);
@@ -80,8 +102,8 @@ export function cleanupFiles(now = Date.now()) {
   const old = f => { try { return fs.statSync(f).mtimeMs < now - 86400e3; } catch { return false; } }; // never a file being written now
   let n = 0;
   for (const f of fs.readdirSync(dirs.out)) {
-    const m = /^(d[0-9a-f]+)(-[1-4]|-v|-p[1-4])?\.(png|jpg)$/.exec(f), id = m && m[1];
-    const keep = m && (keepAll.has(id) || (m[3] === 'jpg' && !m[2] && keepThumb.has(id))); // the -v.jpg goes with the big PNG
+    const m = /^(d[0-9a-f]+|c\d+)(-[1-4]|-v|-p[1-4])?\.(png|jpg)$/.exec(f), id = m && m[1];
+    const keep = m && (keepAll.has(id) || ((m[3] === 'jpg' || id[0] === 'c') && !m[2] && keepThumb.has(id))); // the -v.jpg goes with the big PNG
     if (!keep && old(path.join(dirs.out, f))) { fs.unlinkSync(path.join(dirs.out, f)); n++; }
   }
   for (const f of fs.readdirSync(dirs.img)) {

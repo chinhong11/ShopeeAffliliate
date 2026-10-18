@@ -70,15 +70,16 @@ CREATE TABLE IF NOT EXISTS conversions (
 CREATE TABLE IF NOT EXISTS content (   -- 贴士 / 梗图 posts (src/content.js)
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,                -- tip | meme
-  status TEXT NOT NULL DEFAULT 'draft', -- draft | posting | posted
+  status TEXT NOT NULL DEFAULT 'draft', -- draft | scheduled | posting | posted | deleted (on 已发布)
   data TEXT NOT NULL,                -- JSON (cleanContent)
   fb_post_id TEXT, permalink TEXT, error TEXT,
-  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, posted_at INTEGER
+  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, posted_at INTEGER, scheduled_at INTEGER
 );
 `);
 
 /* migrations for databases created by earlier builds */
 const cols = new Set(db.prepare('PRAGMA table_info(drafts)').all().map(c => c.name));
+if (!new Set(db.prepare('PRAGMA table_info(content)').all().map(c => c.name)).has('scheduled_at')) db.exec('ALTER TABLE content ADD COLUMN scheduled_at INTEGER'); // 定时发布
 if (!cols.has('pending_since')) db.exec('ALTER TABLE drafts ADD COLUMN pending_since INTEGER'); // start of the current 3-day review window
 
 export const kv = {

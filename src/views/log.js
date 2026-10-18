@@ -1,6 +1,7 @@
 /* 已发布: posted / failed / returned, grouped by day */
 import { esc, page } from './html.js';
 import { STRATS, TPL, shortName } from '../mapping.js';
+import { KINDS } from '../content.js';
 import { fmtTime } from '../slots.js';
 import { dayStr } from '../db.js';
 
@@ -25,7 +26,7 @@ export function logView({ brand, rows, count, imgOf }) {
     return `<div class="lg ${r.kind}">
       <img src="${esc(imgOf(r))}" alt="">
       <div class="lt">
-        <div class="l1"><span class="st ${r.kind}">${ST[r.kind]}</span><b>${fmtTime(r.at)}</b>${r.tpl ? `<span class="mt">${TPL[r.tpl] || r.tpl} · ${(STRATS[r.strategy] || {}).zh || ''}</span>` : ''}</div>
+        <div class="l1"><span class="st ${r.kind}">${ST[r.kind]}</span><b>${fmtTime(r.at)}</b>${r.strategy === 'content' ? `<span class="mt">${KINDS[r.tpl] || ''}</span>` : r.tpl ? `<span class="mt">${TPL[r.tpl] || r.tpl} · ${(STRATS[r.strategy] || {}).zh || ''}</span>` : ''}</div>
         <div class="nm">${esc(shortName(r.name))}</div>
         ${r.message ? `<div class="msg">${esc(r.message)}</div>` : ''}
         ${sub ? `<code>${esc(sub)}</code>` : ''}

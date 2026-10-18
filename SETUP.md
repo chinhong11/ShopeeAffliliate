@@ -175,7 +175,9 @@ Two tabs for posts that don't sell anything: a daily-life tip card, or a two-lin
 1. Pick the language. Tap **✨ Gemini 出 4 个点子** (needs the Gemini key above) and **用这个** on one, or tap **自己写**.
 2. Change the words and the post text. The preview changes as you type.
 3. Tap **生成海报** to see the real picture. Any change after that hides it until you tap 生成海报 again.
-4. Tap **发布到 Facebook** to post it now, or leave it as a draft (it stays in 草稿), or **删除** it.
+4. Tap **发布到 Facebook** to post it now, or pick a date and time under **或者定时发布** and tap **定时** (it posts by itself then; **取消定时** puts it back in 草稿), or leave it as a draft, or **删除** it.
+
+Posted tips and memes show on **已发布** (with 查看 / 删除 like product posts) and are counted on **数据**. If one fails at its set time it goes back to 草稿 with the reason, and Telegram tells you.
 
 These post straight away: they don't use the daily posting times or count toward posts per day. Read Gemini's ideas before posting; it is told to avoid religion, race, royalty and politics and not to make up numbers, but check anyway.
 

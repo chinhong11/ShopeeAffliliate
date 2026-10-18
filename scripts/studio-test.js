@@ -187,6 +187,12 @@ try {
   const pm = await p.evaluate(() => { const i = document.getElementById('outImg'), c = document.createElement('canvas'); c.width = 1080; c.height = 1080; const x = c.getContext('2d'); x.drawImage(i, 0, 0);
     const d = x.getImageData(540, 700, 1, 1).data; return { w: i.naturalWidth, rgb: [...d.slice(0, 3)], pv: document.querySelector('#pv iframe').contentDocument.querySelector('img.ph').naturalWidth }; });
   check('梗图: photo in the preview and in the 1080×1080 PNG (not the empty dark card)', pm.w === 1080 && pm.pv > 0 && pm.rgb.some(v => Math.abs(v - 28) > 20), pm);
+  /* 12: 定时发布 from the page: the picked local time goes in, the draft shows when it will go */
+  const later = new Date(Date.now() + 3 * 3600e3), pad = n => String(n).padStart(2, '0');
+  await p.fill('#at', `${later.getFullYear()}-${pad(later.getMonth() + 1)}-${pad(later.getDate())}T${pad(later.getHours())}:${pad(later.getMinutes())}`);
+  await p.click('#schedule'); await p.waitForURL(/memes/); await p.waitForSelector('[data-unschedule]', { timeout: 10000 }).catch(() => {});
+  const sch = await p.evaluate(() => [...document.querySelectorAll('.ct-row span')].map(s => s.textContent).find(t => t.includes('自动发')) || '');
+  check('定时: the draft says when it will post', sch.includes(`${pad(later.getHours())}:${pad(later.getMinutes())}`), sch);
   check('no page errors', !errors.length, errors);
 } finally {
   await b.close(); await closeBrowser(); srv.close();

@@ -91,6 +91,7 @@ app.use('/studio', express.static(path.join(ROOT, 'studio')));
 app.get('/shared/:f', (req, res) => ['mapping.js', 'pick.js', 'brand.js', 'content.js'].includes(req.params.f) ? sendFile(res, path.join(ROOT, 'src', req.params.f), 'text/javascript') : res.status(404).end());
 app.get('/posters/:f', (req, res) => {
   /* {id}.png, {id}-1..4.png (t8 pages), {id}.jpg (card), {id}-v.jpg (edit page) */
+  if (/^c\d+\.png$/.test(req.params.f)) return res.set('Cache-Control', 'private, max-age=86400'), sendFile(res, path.join(dirs.out, req.params.f)); // a posted 贴士 / 梗图
   const m = /^(d[0-9a-f]+)(?:-([1-4]|v|o[1-4]|p[1-4]))?\.(png|jpg)$/.exec(req.params.f);
   const file = !m ? null : m[2] && m[2][0] === 'o' ? (m[3] === 'jpg' ? svc.optionFile(m[1], +m[2][1] - 1) : null) :
     m[2] && m[2][0] === 'p' ? (m[3] === 'jpg' ? pageFile(m[1], +m[2][1]) : null) : m[3] === 'png' ? (m[2] === 'v' ? null : posterFile(m[1], m[2] ? +m[2] : 0)) : !m[2] ? thumbFile(m[1]) : m[2] === 'v' ? viewFile(m[1]) : null;
@@ -169,7 +170,7 @@ app.get('/log', (req, res) => {
     const d = drafts.get(r.draft_id);
     return { ...r, retryable: r.kind === 'failed' && d && d.status === 'failed' };
   });
-  const imgOf = r => fs.existsSync(thumbFile(r.draft_id)) ? `/posters/${r.draft_id}.jpg?k=${r.at}` : (() => { const d = drafts.get(r.draft_id); return d ? '/img/' + d.p.img : ''; })();
+  const imgOf = r => r.strategy === 'content' ? (fs.existsSync(svc.contentFile(r.draft_id.slice(1))) ? `/posters/${r.draft_id}.png` : '') : fs.existsSync(thumbFile(r.draft_id)) ? `/posters/${r.draft_id}.jpg?k=${r.at}` : (() => { const d = drafts.get(r.draft_id); return d ? '/img/' + d.p.img : ''; })();
   res.send(logView({ brand: brand(), rows, count: pendingCount(), imgOf }));
 });
 
@@ -187,7 +188,8 @@ app.get('/stats', async (req, res) => {
   const s = {
     posts: posts.length, hasReport, reportAt: kv.get('reportAt', ''),
     orders: conv.reduce((a, c) => a + (c.o || 0), 0), comm: conv.reduce((a, c) => a + (c.c || 0), 0),
-    strat: group('strategy', STRATS), tpl: group('tpl', TPL)
+    strat: group('strategy', STRATS), tpl: group('tpl', TPL),
+    content: { tip: posts.filter(p => p.strategy === 'content' && p.tpl === 'tip').length, meme: posts.filter(p => p.strategy === 'content' && p.tpl === 'meme').length }
   };
   let models = [], modelsError = '';
   try { models = await gemini.listModels(); } catch (e) { modelsError = e.message; }
@@ -286,6 +288,8 @@ api.post('/content/photo', wrap(req => ({ photo: svc.saveContentPhoto(req.body &
 api.post('/content', wrap(req => ({ item: svc.newContent(req.body && req.body.kind, req.body && req.body.data) })));
 api.post('/content/:id', wrap(req => ({ item: svc.saveContent(req.params.id, req.body && req.body.data) })));
 api.post('/content/:id/post', wrap(async req => ({ item: await svc.postContent(req.params.id) })));
+api.post('/content/:id/schedule', wrap(req => ({ item: svc.scheduleContent(req.params.id, req.body && req.body.at) })));
+api.post('/content/:id/unschedule', wrap(req => ({ item: svc.unscheduleContent(req.params.id) })));
 api.post('/content/:id/resolve', wrap(req => ({ item: svc.resolveContent(req.params.id, !!(req.body && req.body.posted)) })));
 api.post('/content/:id/delete', wrap(req => svc.deleteContent(req.params.id)));
 api.post('/posts/:id/retry', wrap(req => publish.retryPost(Number(req.params.id))));
