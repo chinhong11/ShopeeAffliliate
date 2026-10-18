@@ -33,13 +33,12 @@ function expiry(d, expireMs, now) {
 function card(d, st, expireMs, now) {
   const p = d.p;
   return `<article class="card" data-id="${d.id}">
-    <a class="pv" href="/d/${d.id}">${posterBlock(d, st)}
-      <div class="chips"><span class="chip ${d.strat}">${STRATS[d.strat].zh}</span>${d.isNew ? '<span class="chip new">新</span>' : ''}${p.mock ? '<span class="chip new">MOCK</span>' : ''}${d.form.lang === 'ms' ? '<span class="chip lang">Melayu</span>' : ''}</div>
-    </a>
+    <a class="pv" href="/d/${d.id}">${posterBlock(d, st)}</a>
     <div class="bd">
+      <div class="chips"><span class="chip ${d.strat}">${STRATS[d.strat].zh}</span>${d.isNew ? '<span class="chip new">新</span>' : ''}${p.mock ? '<span class="chip new">MOCK</span>' : ''}${d.form.lang === 'ms' ? '<span class="chip lang">Melayu</span>' : ''}</div>
       ${priceWarn(d.priceChanged, '海报已按新价格更新，确认后再批准。')}
       ${expiry(d, expireMs, now)}
-      <h3 class="nm">${esc(p.name)}</h3>
+      <h2 class="nm">${esc(p.name)}</h2>
       ${priceRow(p)}
       <div class="cm"><b>${commOf(p)}</b> · ${TPL[d.form.tpl]}</div>
       <div class="act">
@@ -57,7 +56,7 @@ function slotCard(s, entry, paused, posted) {
   if (s.status === 'used') { cls = 'filled'; sub = posted ? fmtTime(posted.at) + ' 已发' : '已发'; name = posted ? shortName(posted.name) : '已发布'; }
   else if (s.status === 'returned') { cls = 'empty'; sub = '退回'; name = '查价变了，没有发'; }
   else if (s.status === 'failed') { cls = 'paused'; sub = '失败'; name = '发帖失败，看「已发布」'; }
-  else if (s.status === 'skipped' || s.status === 'past') { cls = 'empty'; sub = '已过'; name = '没有批准的，这个时段跳过'; }
+  else if (s.status === 'skipped' || s.status === 'past') { cls = 'empty'; sub = '已过'; name = '没有批准的，已跳过'; }
   else if (paused) { cls = 'paused'; sub = '暂停'; name = entry ? shortName(entry.d.p.name) : '发布已暂停'; }
   else if (entry) { cls = 'filled'; sub = '约 ' + (s.plannedAt ? fmtTime(s.plannedAt) : s.label) + ' 发'; name = shortName(entry.d.p.name); href = `/d/${entry.d.id}`; }
   else { cls = 'empty'; sub = '今天'; name = '空，批准一张就排进来'; }

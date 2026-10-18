@@ -46,6 +46,11 @@ export function brandView({ brand, count, o, b, pageId }) {
           </ol>
           <div class="hint">Facebook 的按钮名称偶尔会改，找最接近的就行。App 不会自己换：Facebook 现在的公开 API 文档里找不到修改专页封面和头像的接口，所以由你下载后自己上传。</div>
         </section>
+        <section class="sec">
+          <div class="sec-h"><span class="ic">🚪</span><h2>退出登录</h2></div>
+          <div class="hint">用别人的手机或电脑登录过，用完点一下。改 ADMIN_PASSWORD 会让所有设备都退出。</div>
+          <form method="post" action="/logout"><button class="btn btn-ghost">退出</button></form>
+        </section>
       </div>
     </div><div class="endpad"></div></div>`;
   return page({ title: '主页图', brand, body, tab: 'brand', count, data: { o, b }, script: '/static/brand.js' });

@@ -12,7 +12,7 @@ export const bag = size => `<svg viewBox="0 0 24 24" fill="none" width="${size}"
 
 const TABS = [['queue', '待审核', '/'], ['log', '已发布', '/log'], ['stats', '数据', '/stats'], ['brand', '主页图', '/brand']];
 const tabButtons = (tab, count) => TABS.map(([k, l, href]) =>
-  `<a role="tab" class="tab" href="${href}" aria-selected="${tab === k}">${l}${k === 'queue' && count > 0 ? `<span class="bdg">${count}</span>` : ''}</a>`).join('');
+  `<a class="tab" href="${href}"${tab === k ? ' aria-current="page"' : ''}>${l}${k === 'queue' && count > 0 ? `<span class="bdg">${count}</span>` : ''}</a>`).join('');
 
 export function page({ title, brand, body, tab = null, count = 0, nav = true, script = '', data = null }) {
   return `<!DOCTYPE html>
@@ -37,9 +37,9 @@ export function page({ title, brand, body, tab = null, count = 0, nav = true, sc
 </head>
 <body>
 <div class="rv" id="rv"><script>document.getElementById('rv').classList.add(innerWidth>=900?'desk':'phone')</script>
-${nav ? `<div class="topnav"><div class="tn-brand"><span class="tn-logo">${bag(18)}</span><b>${esc(brand)} 带货后台</b></div><nav role="tablist">${tabButtons(tab, count)}</nav></div>` : ''}
+${nav ? `<div class="topnav"><div class="tn-brand"><span class="tn-logo">${bag(18)}</span><b>${esc(brand)} 带货后台</b></div><nav aria-label="主菜单">${tabButtons(tab, count)}</nav><form method="post" action="/logout" class="tn-out"><button class="btn btn-ghost btn-sm">退出</button></form></div>` : ''}
 <main class="rv-main" id="main">${body}</main>
-${nav ? `<nav class="tabs" role="tablist">${tabButtons(tab, count)}</nav>` : ''}
+${nav ? `<nav class="tabs" aria-label="主菜单">${tabButtons(tab, count)}</nav>` : ''}
 <div id="toast-slot" role="status" aria-live="polite"></div>
 </div>
 ${data ? `<script type="application/json" id="data">${json(data)}</script>` : ''}

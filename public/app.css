@@ -168,3 +168,9 @@ body{background:var(--bg);-webkit-tap-highlight-color:transparent}
 .bp-out img.avatar{width:min(220px,60%);border-radius:50%}
 .bp-steps{margin:0 0 10px;padding-left:20px;line-height:1.8;font-size:14px}
 .bp-steps a{color:var(--shopee-2)}
+/* UI pass: the current tab (links, not tabs), chips under the poster, slot messages on two lines, 退出 */
+.rv .tab[aria-current=page]{background:var(--panel-3);color:var(--text)}
+.rv .bd .chips{position:static;flex-wrap:wrap;margin-bottom:8px}
+.rv .slot .sn span{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-height:1.35}
+.rv .tn-out{margin-left:auto}
+

@@ -9,7 +9,7 @@ let list = [], run = 0, busy = false;
 
 function draw() {
   $('grid').innerHTML = list.map((o, n) => `<article class="ds-card">
-    <div class="ds-img">${o.preview ? `<img src="${esc(o.preview)}" alt="设计 ${n + 1}">` : `<div class="pv-over"><i class="spin"></i><span>${o.error ? esc(o.error) : '画海报中…'}</span></div>`}</div>
+    <div class="ds-img">${o.preview ? `<img src="${esc(o.preview)}" alt="设计 ${n + 1}">` : `<div class="pv-over">${o.error ? '' : '<i class="spin"></i>'}<span>${o.error ? esc(o.error) : '画海报中…'}</span></div>`}</div>
     <div class="ds-bd"><b>${n + 1} · ${esc(TPL[o.tpl] || o.tpl)}</b><span>${esc(o.why)}</span></div>
     <button class="btn btn-primary" data-use="${n}"${o.preview ? '' : ' disabled'}>用这款</button>
   </article>`).join('');

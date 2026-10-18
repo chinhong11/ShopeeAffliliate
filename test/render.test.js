@@ -11,7 +11,7 @@ import { chromium } from 'playwright';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'render-'));
 Object.assign(process.env, { GEMINI_API_KEY: '', // never the real key from .env
-  DATA_DIR: tmp, CONFIG_FILE: path.join(tmp, 'none.json'), RENDER_TIMEOUT_MS: '8000' });
+  DATA_DIR: tmp, CONFIG_FILE: path.join(tmp, 'none.json'), RENDER_TIMEOUT_MS: '15000' });
 const can = process.platform === 'linux' && (process.env.CHROMIUM_PATH || fs.existsSync(chromium.executablePath()));
 const { renderState, closeBrowser } = await import('../src/render.js');
 test.after(() => closeBrowser());
@@ -43,7 +43,7 @@ test('stuck render (a photo that never loads): fails at the deadline, the next o
   await new Promise(r => hang.listen(0, '127.0.0.1', r));
   const t0 = Date.now();
   await assert.rejects(renderState(state(`http://127.0.0.1:${hang.address().port}/x.jpg`)), /超时|timeout/i);
-  assert.ok(Date.now() - t0 < 20000);
+  assert.ok(Date.now() - t0 < 30000); // the 15 s deadline: a fresh Chromium start next to other test files' renders needs more than 8 s
   hang.close();
   const ok = await renderState(state(photo));
   assert.ok(ok.png.length > 10000);

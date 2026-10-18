@@ -37,7 +37,7 @@ export function logView({ brand, rows, count, imgOf }) {
     </div>`;
   };
   const body = `
-    <header class="rv-head"><div class="grow"><h1>已发布</h1><div class="hsub">每条链接都带追踪码（Shopee 报告里的 Sub ID），以后用来统计哪个模板卖得好</div></div></header>
+    <header class="rv-head"><div class="grow"><h1>已发布</h1><div class="hsub">发出去的帖子都在这里，点一条可以去 Facebook 看</div></div></header>
     <div class="rv-scroll" id="scroll">
       ${rows.some(r => r.kind === 'posted' && r.permalink) ? '<div class="hint boost-tip">想花钱推广一帖：点「推广 ↗」打开帖子，再点帖子下面的「加速推广 / Boost post」，在 Facebook 里选预算、天数和受众。</div>' : ''}
       ${groups.length ? groups.map(g => `<section><div class="lbl">${esc(g.label)}</div><div class="lgc">${g.items.map(item).join('')}</div></section>`).join('')

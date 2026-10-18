@@ -48,7 +48,7 @@ test('the 主页图 page needs the login, starts in config.json\'s language and 
   assert.equal(anon.status, 302);
   const r = await get('/brand'), h = await r.text();
   assert.equal(r.status, 200);
-  assert.ok(h.includes('href="/brand" aria-selected="true">主页图'));
+  assert.ok(h.includes('href="/brand" aria-current="page">主页图'));
   assert.ok(h.includes('Barang Shopee terbaik setiap hari'), 'Malay default text from "language": "ms"');
   assert.ok(h.includes('https://www.facebook.com/page1'));
   assert.equal((await get('/shared/brand.js')).status, 200, 'the page previews with the same module');

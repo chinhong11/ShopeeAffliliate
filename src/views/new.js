@@ -5,7 +5,7 @@ export function newView({ brand, count }) {
   const body = `<div class="ed" id="nw">
     <div class="ed-top">
       <a class="back" href="/">‹ 返回</a>
-      <b class="tt">手动添加商品</b>
+      <b class="tt" role="heading" aria-level="1">手动添加商品</b>
     </div>
     <div class="rv-scroll" id="scroll"><form class="ed-form" id="nf" novalidate>
       <section class="sec desk-only bm-sec">

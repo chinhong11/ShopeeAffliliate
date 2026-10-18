@@ -65,7 +65,7 @@ app.post('/login', express.urlencoded({ extended: false, limit: '4kb' }), (req, 
   if (!r.ok) return res.status(r.locked ? 429 : 401).send(loginView({ brand: brand(), error: r.error }));
   res.set('Set-Cookie', sessionCookie()).redirect('/');
 });
-app.post('/logout', (req, res) => res.set('Set-Cookie', clearCookie()).redirect('/login'));
+app.post('/logout', (req, res) => req.get('Sec-Fetch-Site') === 'cross-site' ? res.status(403).end() : res.set('Set-Cookie', clearCookie()).redirect('/login')); // not from another site
 
 /* Telegram webhook (public; secret in the path + header) */
 app.use(telegram.router);

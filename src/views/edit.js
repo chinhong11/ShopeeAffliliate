@@ -8,7 +8,7 @@ export function editView({ brand, d, st, cfg, count, dirty }) {
   const body = `<div class="ed" id="ed">
     <div class="ed-top">
       <a class="back" href="/" id="back">‹ 返回</a>
-      <b class="tt">${d.status === 'approved' ? '已批准的草稿' : '编辑草稿'}<small class="sv" id="sv" aria-live="polite"></small></b>
+      <b class="tt" role="heading" aria-level="1">${d.status === 'approved' ? '已批准的草稿' : '编辑草稿'}<small class="sv" id="sv" aria-live="polite"></small></b>
       <span class="chip ${d.strat}">${STRATS[d.strat].zh}</span>
     </div>
     <div class="rv-scroll" id="scroll"><div class="ed-grid">
@@ -16,7 +16,7 @@ export function editView({ brand, d, st, cfg, count, dirty }) {
         ${posterBlock(d, st, { dirty, big: true })}
         <div class="pages" id="pages" hidden></div>
         <div class="ed-meta">
-          <h3 class="nm">${esc(p.name)}</h3>
+          <h2 class="nm">${esc(p.name)}</h2>
           ${priceRow(p)}
           <div class="cm"><b>${commOf(p)}</b></div>
           ${priceWarn(d.priceChanged, '海报已按新价格更新。')}

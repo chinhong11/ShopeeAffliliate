@@ -1,6 +1,8 @@
 /* Step 6: slot planning, expiry, cleanup, token check, daily catch-up, lease */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+/* the test runner reads its results from stdout: the app's log lines there could corrupt them ("Unable to deserialize cloned data") */
+console.log = (...a) => console.error(...a);
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

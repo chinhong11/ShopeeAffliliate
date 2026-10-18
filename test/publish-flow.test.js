@@ -2,6 +2,8 @@
    recording. Fake Shopee GraphQL + fake Graph API servers, drafts inserted directly (no browser needed). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+/* the test runner reads its results from stdout: the app's log lines there could corrupt them ("Unable to deserialize cloned data") */
+console.log = (...a) => console.error(...a);
 import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';

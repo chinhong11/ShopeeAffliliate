@@ -62,6 +62,7 @@ export async function refresh() {
 
 /* poll while posters render or a collect runs */
 let pollT = 0;
+let approving = 0; // approvals on their way
 function watch() {
   clearTimeout(pollT);
   if ($('#ed')) return; // the edit screen polls for itself (a refresh would drop unsaved edits)
@@ -83,7 +84,7 @@ function watch() {
           return;
         }
       }
-      if (pending.some(id => !s.rendering.includes(id))) return refresh();
+      if (pending.some(id => !s.rendering.includes(id))) return approving ? watch() : refresh(); // a refresh would bring back an enabled 批准 mid-approval
     } catch {}
     watch();
   }, collecting ? 800 : 1500);
@@ -92,7 +93,7 @@ let collecting = !!$('#hsub.busy');
 
 const ACT = {
   async approve(id, btn) {
-    btn.disabled = true; btn.textContent = '批准中…';
+    btn.disabled = true; btn.textContent = '批准中…'; approving++;
     try {
       let r = await api(`/drafts/${id}/approve`, {});
       if (r.confirm) {
@@ -102,6 +103,7 @@ const ACT = {
       await refresh(); toast(r.again ? '已保存修改' : '已批准 · ' + (r.slot || '等空位') + ' 发布');
     }
     catch (e) { btn.disabled = false; btn.textContent = '批准'; toast(e.message); }
+    finally { approving--; }
   },
   async skip(id) {
     await api(`/drafts/${id}/skip`, {}); await refresh();

@@ -105,6 +105,12 @@ With Telegram, the app sends each day's posters with ✅ 批准 / ❌ 跳过 / �
    TELEGRAM_WEBHOOK_SECRET=16 or more letters, digits, _ or -
    ```
 
+## Optional: AI design and captions (Gemini)
+With a free Gemini key, each new draft gets its own poster design, **✨ AI 设计** offers 4 designs to choose from, and **✨ AI 写文案** writes captions. Without it everything else works.
+1. Open https://aistudio.google.com/apikey and sign in with a Google account.
+2. Tap **Create API key** and copy the key.
+3. In Railway **Variables**, add `GEMINI_API_KEY=` followed by the key, and click **Deploy**. On your own computer, put the same line in `.env` and start the app again.
+
 ## Step 5: First run
 1. On your phone, open the app's address (the `PUBLIC_URL` from Step 3) and log in with your `ADMIN_PASSWORD`.
 2. Add it to your home screen so it opens like an app:
