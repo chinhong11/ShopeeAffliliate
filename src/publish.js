@@ -46,7 +46,7 @@ export async function priceCheck(d, { dryRun = false } = {}) {
   const p = { ...o, price: n.price, priceMax: n.priceMax, disc: n.disc, rating: n.rating ?? o.rating, sales: n.sales || o.sales, comm: n.comm || o.comm };
   /* the headline and hand-edited captions were written from the old numbers */
   const f = { ...d.form, ...refreshHeadline(d.form, o, p, cfg) };
-  for (const k of ['cap1', 'cap2']) if (f[k + 'Manual']) f[k] = swapNumbers(f[k], o, p, cfg);
+  for (const k of ['cap1', 'cap2']) if (f[k + 'Manual']) f[k] = swapNumbers(f[k], o, p);
   const nd = { ...d, p, form: f };
   refreshCaptions(nd, cfg);
   drafts.update(d.id, { p, form: nd.form });

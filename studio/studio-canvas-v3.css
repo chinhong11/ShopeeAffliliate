@@ -383,7 +383,7 @@
 #post.t1 .bb-proof,#post.t2 .bb-proof,#post.t6c .bb-proof{color:var(--panelink,var(--inkk));}
 #post.t6c .bb-proof{color:var(--panelink,#fff);}
 #post.t1 .bb-proof .sold,#post.t2 .bb-proof .sold{color:var(--panelink,#6c6c6c);opacity:.85;}
-/* a small photo (post-studio-v3.js applyPhotoBox): sharp in the middle, a blurred copy of itself fills the rest */
-#photo.small,.cellphoto.small{background-image:none!important;overflow:hidden;}
-#photo.small::before,.cellphoto.small::before{content:"";position:absolute;inset:-40px;background:var(--img) center/cover no-repeat;filter:blur(28px) brightness(.88) saturate(1.1);}
-#photo.small::after,.cellphoto.small::after{content:"";position:absolute;inset:0;background:var(--img) center/var(--sw) auto no-repeat;}
+/* a photo shown whole, or a small one (post-studio-v3.js applyPhotoBox): sharp in the middle, a blurred copy of itself fills the rest */
+#photo.framed,.cellphoto.framed{background-image:none!important;overflow:hidden;}
+#photo.framed::before,.cellphoto.framed::before{content:"";position:absolute;inset:-40px;background:var(--img) center/cover no-repeat;filter:blur(28px) brightness(.88) saturate(1.1);}
+#photo.framed::after,.cellphoto.framed::after{content:"";position:absolute;inset:0;background:var(--img) center/var(--sw) auto no-repeat;}

@@ -66,6 +66,8 @@ export async function openStudio({ fresh = false } = {}) {
     return page;
   } catch (e) {
     page.close().catch(() => {}); // don't leave a half-loaded studio page in the shared context
+    /* our own local page aborting its load = the renderer died while loading it (e.g. out of memory): restart Chromium */
+    if (/ERR_ABORTED|frame was detached|crash/i.test(e.message)) throw Object.assign(new Error('Chromium 渲染进程崩溃了（可能是内存不够）'), { fatal: true });
     throw e;
   }
 }

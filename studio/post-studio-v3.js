@@ -133,11 +133,15 @@ function applyPhotoBox(el,o){
   const coverW=Math.max(100,(chh/cw)*(o.iw/o.ih)*100);
   el.style.backgroundSize=(coverW*o.zoom/100)+'% auto';
   el.style.backgroundPosition=`${o.x}% ${o.y}%`;
-  /* a photo the export (2× this size) would enlarge more than 2.5× is not stretched: it is shown at most 1.25 CSS px per
-     photo px, centred on a blurred copy of itself (studio-canvas-v3.css .small); a zoomed photo is left as set */
-  const big=coverW/100*cw*2/(o.iw||1)>2.5&&o.zoom===100&&o.iw>0;
-  el.classList.toggle('small',big);
-  if(big){el.style.setProperty('--img',`url(${o.img})`);el.style.setProperty('--sw',Math.min(o.iw*1.25,cw,chh*o.iw/o.ih)+'px');}
+  /* framed on a blurred copy of itself (studio-canvas-v3.css .framed) instead of filling the box:
+     - whole: a photo the box would cut by more than 10 % is shown in full (a square Shopee photo above the panel lost 40 %:
+       the product's top and bottom); a photo moved or zoomed by hand is left as set
+     - small: one the export (2× this size) would enlarge more than 2.5× is shown at most 1.25 CSS px per photo px */
+  const coverH=coverW/100*cw*o.ih/(o.iw||1),fitW=Math.min(cw,chh*o.iw/(o.ih||1));
+  const whole=o.zoom===100&&o.x===50&&o.y===50&&o.iw>0&&cw*chh/(coverW/100*cw*coverH)<.9;
+  const small=o.zoom===100&&o.iw>0&&(whole?fitW:coverW/100*cw)*2/o.iw>2.5;
+  el.classList.toggle('framed',whole||small);
+  if(whole||small){el.style.setProperty('--img',`url(${o.img})`);el.style.setProperty('--sw',(small?Math.min(o.iw*1.25,fitW):fitW)+'px');}
   else{el.style.removeProperty('--img');el.style.removeProperty('--sw');}
 }
 function applyPhotos(){
@@ -237,10 +241,15 @@ function applyVars(){
    a line that still wraps at 75 % is long on purpose and keeps the chosen size.
    t2 big price: shrinks so it ends left of the 评论区拿链接 button instead of running under it. */
 function fitLine1(){
-  const el=$('line1'),ink=el.querySelector('.ink');
-  el.style.fontSize='';
+  const el=$('line1'),ink=el.querySelector('.ink'),cap=$('caption'),tag=$('priceTag');
+  el.style.fontSize='';cap.style.right='';
+  /* 爆款分享 / 杂志封面: the price tag grows with the price (RM 1299.90); the words end left of it instead of under it */
+  if((post.classList.contains('t1')||post.classList.contains('t6c'))&&state.price&&tag.offsetWidth){
+    const r=post.offsetWidth-tag.offsetLeft+24;if(r>parseFloat(getComputedStyle(cap).right))cap.style.right=r+'px';
+  }
   const t=ink.textContent;if(!t.trim()||el.style.display==='none')return;
-  const want=t.split('\n').length;
+  /* lines wanted: the typed ones, or one where the template runs them together (价格暴击) */
+  const want=/pre/.test(getComputedStyle(el).whiteSpace)?t.split('\n').length:1;
   /* lines drawn = distinct tops of the text's line boxes (a typed line break adds an empty box on its own line) */
   const lines=()=>new Set([...ink.getClientRects()].filter(r=>r.width>1).map(r=>Math.round(r.top))).size;
   if(lines()<=want)return;
@@ -321,7 +330,7 @@ setInterval(()=>{if(state.tpl==='t3')renderCd();},500);
 function applyFlash(){
   renderCd();
   $('stockTxt').textContent=state.stockTxt;
-  $('stockPctTxt').textContent='已抢 '+state.stockPct+'%';
+  $('stockPctTxt').textContent=state.lang==='ms'?state.stockPct+'% dah direbut':'已抢 '+state.stockPct+'%';
   $('stockWrap').style.setProperty('--stock',state.stockPct+'%');
 }
 /* caption builder */
@@ -391,8 +400,13 @@ function applyTemplate(){
   requestAnimationFrame(()=>{applyPhotos();});
   fitText();
 }
+/* words drawn on the poster that aren't in the state: Bahasa Melayu for lang 'ms', else the page's own Chinese */
+const WORDS_MS={'#cdLabel':'Harga asal kembali dalam','#rbVerified':'✅ Pembelian disahkan','#ribbon':'⚡ Flash sale · Cepat sebelum habis ⚡',
+  '.ch-date span':'Hari ini','.lprev .ltxt span':'Flash sale hari ini · Stok terhad'};
+const WORDS_ZH={};for(const k in WORDS_MS)WORDS_ZH[k]=document.querySelector(k).textContent;
+function applyWords(){for(const k in WORDS_MS)document.querySelector(k).textContent=(state.lang==='ms'?WORDS_MS:WORDS_ZH)[k];}
 function applyAll(){
-  applyVars();applyTemplate();applyText();applyConv();applyBrand();
+  applyWords();applyVars();applyTemplate();applyText();applyConv();applyBrand();
   applyChat();applyReview();applyFlash();applyCaption(false);score();
   syncPhotoUI();
 }
@@ -443,7 +457,7 @@ function markSw(box,val){
 }
 function renderHooks(){
   const box=$('hooksBox');box.innerHTML='';
-  HOOKS[state.lang].forEach(h=>{
+  (HOOKS[state.lang]||HOOKS.zh).forEach(h=>{
     const b=document.createElement('button');
     const k=document.createElement('span');k.className='k';k.textContent=h.k;
     b.appendChild(k);b.appendChild(document.createTextNode(h.l1.replace(/\n/g,' ')));
@@ -457,7 +471,7 @@ function renderHooks(){
 }
 function renderCtaChips(){
   const box=$('ctaChips');box.innerHTML='';
-  CTAS[state.lang].forEach(t=>{
+  (CTAS[state.lang]||CTAS.zh).forEach(t=>{
     const b=document.createElement('button');b.textContent=t;
     b.addEventListener('click',()=>{state.ctaText=t;$('dCtaIn').value=t;applyConv();save();});
     box.appendChild(b);

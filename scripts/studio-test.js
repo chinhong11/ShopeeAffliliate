@@ -1,6 +1,8 @@
-/* 在 Studio 精修 → 保存到草稿, in a real browser on sample products: the posted poster is the studio's own export,
-   the save message names what stayed the app's, the edit page reloads by itself, 清除 brings the app's look back.
-   Offline (SHOPEE_MOCK, temp data dir). `npm run studio-test` */
+/* In a real browser on sample products, offline (SHOPEE_MOCK, temp data dir, no Gemini / Telegram). `npm run studio-test`
+   - the studio opened on a draft (…v3.html?draft=<id>) → 保存到草稿: the posted poster is the studio's own export, the save
+     message names what stayed the app's, the edit page reloads by itself, 用基本样式 brings the app's look back
+   - a square Shopee photo is shown whole above the panel, not cropped
+   - 海报和文案的语言: Bahasa Melayu ↔ 中文 on the edit page changes the headline, captions and poster, and is saved */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,7 +12,7 @@ import { chromium } from 'playwright';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-'));
 const cfg = JSON.parse(fs.readFileSync(new URL('../config.example.json', import.meta.url)));
 fs.writeFileSync(path.join(tmp, 'config.json'), JSON.stringify({ ...cfg, categories: [{ name: 'T', productCatId: null }] }));
-Object.assign(process.env, { DATA_DIR: tmp, CONFIG_FILE: path.join(tmp, 'config.json'), SHOPEE_MOCK: '1', DISABLE_JOBS: '1', ADMIN_PASSWORD: 'pw', SESSION_SECRET: 'x'.repeat(32) });
+Object.assign(process.env, { DATA_DIR: tmp, CONFIG_FILE: path.join(tmp, 'config.json'), SHOPEE_MOCK: '1', DISABLE_JOBS: '1', ADMIN_PASSWORD: 'pw', SESSION_SECRET: 'x'.repeat(32), GEMINI_API_KEY: '', TELEGRAM_BOT_TOKEN: '' }); // never the real keys from .env
 const { app } = await import('../src/server.js');
 const { collect } = await import('../src/collect.js');
 const { drafts } = await import('../src/db.js');
@@ -36,9 +38,16 @@ try {
   await p.goto(B + '/login'); await p.fill('#pw', 'pw'); await p.click('button[type=submit]'); await p.waitForURL(B + '/');
   await p.goto(B + '/d/' + d.id); await posterReady();
   const key0 = drafts.get(d.id).posterKey;
-  const [s] = await Promise.all([ctx.waitForEvent('page'), p.click('#studio')]);
-  s.on('pageerror', e => errors.push('studio: ' + e.message));
-  await s.waitForSelector('.rvb-save:not([disabled])', { timeout: 120000 });
+  const studio = async () => {
+    const s = await ctx.newPage(); s.on('pageerror', e => errors.push('studio: ' + e.message));
+    await s.goto(`${B}/studio/Shopee%20Post%20Maker%20v3.html?draft=${d.id}`);
+    await s.waitForSelector('.rvb-save:not([disabled])', { timeout: 120000 }); await s.waitForTimeout(300);
+    return s;
+  };
+  const s = await studio();
+  /* 0: the square sample photo above the panel: shown whole (framed on a blurred copy), not cut to the box */
+  const ph = await s.evaluate(() => { const e = document.querySelector('#photo.framed, .cellphoto.framed'); return { tpl: window.PostStudio.getState().tpl, framed: !!e, sw: e ? getComputedStyle(e).getPropertyValue('--sw') : '' }; });
+  check(`square photo shown whole (${ph.tpl}, ${ph.sw.trim()} wide)`, ph.framed && ['t1', 't2', 't6'].includes(ph.tpl), ph);
   const set = (sel, v) => s.$eval(sel, (e, v) => { e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); }, String(v));
   /* tap 保存到草稿 → its message; a real save also reloads the edit page */
   const save = async () => {
@@ -96,7 +105,30 @@ try {
   /* 6: 清除 on the edit page → the app's own look and poster again */
   await s.close(); await p.waitForSelector('#lookNote:not([hidden])'); await posterReady();
   await p.click('#lookClear'); await p.click('#regen'); await p.waitForTimeout(300); await posterReady(); await p.waitForTimeout(500);
-  check('清除 → original poster', !form().look && drafts.get(d.id).posterKey === key0, form().look);
+  check('用基本样式 → original poster', !form().look && drafts.get(d.id).posterKey === key0, form().look);
+
+  /* 7: 海报和文案的语言 → Bahasa Melayu: headline, captions, saved, a new poster with Malay words */
+  const HAN = /[\u3400-\u9fff]/;
+  await p.click('[data-lang="ms"]');
+  const msForm = await p.evaluate(() => ({ l1: document.getElementById('l1').value, c1: document.getElementById('c1').value, c2: document.getElementById('c2').value, on: document.querySelector('[data-lang="ms"]').getAttribute('aria-pressed') }));
+  check('Melayu: headline in Malay', !HAN.test(msForm.l1) && msForm.on === 'true', msForm);
+  check('Melayu: captions in Malay', msForm.c1.includes('Link pembelian di komen pertama') && msForm.c2.includes('ada di sini'), msForm);
+  await p.click('#regen'); await p.waitForTimeout(300); await posterReady(); await p.waitForTimeout(500);
+  check('Melayu: saved with the draft, new poster', form().lang === 'ms' && form().cap1.includes('Link pembelian di komen pertama') && drafts.get(d.id).posterKey !== key0, { lang: form().lang, key: drafts.get(d.id).posterKey });
+  const s2 = await studio();
+  const words = await s2.evaluate(() => ({ cta: document.getElementById('ctaFloat').textContent, bar: document.getElementById('bbCta').textContent, sold: document.getElementById('bbSold').textContent, line1: document.getElementById('line1').textContent, verified: document.getElementById('rbVerified').textContent }));
+  check('Melayu: words on the poster', words.bar === 'Link di komen 👇' && /terjual/.test(words.sold) && !HAN.test(words.line1) && words.verified === '✅ Pembelian disahkan', words);
+  await s2.close();
+  await p.goto(B + '/');
+  check('Melayu: the card says so', await p.$eval(`.card[data-id="${d.id}"]`, c => !!c.querySelector('.chip.lang')).catch(() => false));
+
+  /* 8: back to 中文 */
+  await p.goto(B + '/d/' + d.id); await posterReady();
+  await p.click('[data-lang="zh"]');
+  const zh = await p.evaluate(() => ({ l1: document.getElementById('l1').value, c1: document.getElementById('c1').value }));
+  check('中文 again: headline and captions', HAN.test(zh.l1) && zh.c1.includes('购买链接放在第一条评论'), zh);
+  await p.click('#regen'); await p.waitForTimeout(300); await posterReady(); await p.waitForTimeout(500);
+  check('中文 again: saved, the first poster back', form().lang === 'zh' && drafts.get(d.id).posterKey === key0, form().lang);
   check('no page errors', !errors.length, errors);
 } finally {
   await b.close(); await closeBrowser(); srv.close();

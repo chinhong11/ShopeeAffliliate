@@ -34,7 +34,7 @@ function card(d, st, expireMs, now) {
   const p = d.p;
   return `<article class="card" data-id="${d.id}">
     <a class="pv" href="/d/${d.id}">${posterBlock(d, st)}
-      <div class="chips"><span class="chip ${d.strat}">${STRATS[d.strat].zh}</span>${d.isNew ? '<span class="chip new">新</span>' : ''}${p.mock ? '<span class="chip new">MOCK</span>' : ''}</div>
+      <div class="chips"><span class="chip ${d.strat}">${STRATS[d.strat].zh}</span>${d.isNew ? '<span class="chip new">新</span>' : ''}${p.mock ? '<span class="chip new">MOCK</span>' : ''}${d.form.lang === 'ms' ? '<span class="chip lang">Melayu</span>' : ''}</div>
     </a>
     <div class="bd">
       ${priceWarn(d.priceChanged, '海报已按新价格更新，确认后再批准。')}

@@ -2,13 +2,14 @@
    The link is never left to the model: it writes {link} and the real affiliate link goes in here. */
 import { env } from './config.js';
 import { kv, dayStr } from './db.js';
-import { rm, shortName, wasOf, pctOf, rateOf, fmtSold, hasDisc, hasRating } from './mapping.js';
+import { rm, shortName, wasOf, pctOf, rateOf, fmtSold, hasDisc, hasRating, langOf, tagsOf } from './mapping.js';
+import { COMMENT_MS } from './pick.js';
 
 export const enabled = () => !!env.GEMINI_API_KEY;
 const LINK = '{link}';
 
 export function prompt(d, cfg) {
-  const p = d.p, f = d.form, direct = cfg.linkMode === 'direct', code = (cfg.voucherCode || '').trim();
+  const p = d.p, f = d.form, direct = cfg.linkMode === 'direct', code = (cfg.voucherCode || '').trim(), ms = langOf(cfg, f) === 'ms';
   const facts = [
     `商品：${shortName(p.name)}（完整名称：${p.name}）`,
     `现价：${rm(p.price)}`,
@@ -24,8 +25,8 @@ export function prompt(d, cfg) {
 
 ${facts}
 
-用简体中文写两段：
-1. post：帖子正文，4 到 7 行。第一句要吸引人，正文里提到价格${code ? '和折扣码' : ''}。${direct ? `要有一行放购买链接，链接只写 ${LINK}（会自动换成真的链接）。` : '最后一行写「👉 购买链接放在第一条评论 👇」。'}不要写任何网址，不要写 hashtag。
+${ms ? '用马来文写两段（Bahasa Melayu，马来西亚 Facebook 上轻松自然的口语，可以夹一点常用英文，不要用中文）' : '用简体中文写两段'}：
+1. post：帖子正文，4 到 7 行。第一句要吸引人，正文里提到价格${code ? '和折扣码' : ''}。${direct ? `要有一行放购买链接，链接只写 ${LINK}（会自动换成真的链接）。` : `最后一行写「${ms ? COMMENT_MS : '👉 购买链接放在第一条评论 👇'}」。`}不要写任何网址，不要写 hashtag。
 2. comment：第一条评论。${direct ? '写空字符串。' : `1 到 3 行短句，里面放购买链接，链接只写 ${LINK}。`}`;
 }
 
@@ -44,7 +45,8 @@ export async function captions(d, cfg, fetchImpl = fetch) {
   let post = clean(out.post);
   const comment = cfg.linkMode === 'direct' ? '' : clean(out.comment);
   if (!post) throw new Error('Gemini 没有写出文案，再试一次');
-  if (cfg.hashtags) post += '\n\n' + cfg.hashtags;
+  const tags = tagsOf(cfg, langOf(cfg, d.form));
+  if (tags) post += '\n\n' + tags;
   return { cap1: post, cap2: comment };
 }
 

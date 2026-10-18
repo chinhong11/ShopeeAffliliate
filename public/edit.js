@@ -1,6 +1,6 @@
 /* 编辑草稿 */
 import { api, toast, toastNext, flagSmall } from '/static/app.js';
-import { TPL, TPL_NOTE, TPL_LOCK, TPL_ORDER, LAYOUT, posterKey } from '/shared/mapping.js';
+import { TPL, TPL_NOTE, TPL_LOCK, TPL_ORDER, LAYOUT, LANGS, langOf, posterKey } from '/shared/mapping.js';
 import { suggest, availability, cap1, cap2, isPersonal } from '/shared/pick.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -27,6 +27,11 @@ $('#form').innerHTML = `
     <div class="sec-h"><span class="ic">🎨</span><h2>模板</h2><span class="tip">自动选：${esc(TPL[f.autoTpl])}</span></div>
     <div class="tps" id="tps"></div>
     <div id="unlock"></div>
+  </section>
+  <section class="sec">
+    <div class="sec-h"><span class="ic">🌐</span><h2>海报和文案的语言</h2><span class="tip">后台一直是中文</span></div>
+    <div class="when" id="langs">${Object.entries(LANGS).map(([k, v]) => `<button type="button" class="btn btn-ghost btn-sm" data-lang="${k}">${v}</button>`).join('')}</div>
+    <div class="hint" id="langHint"></div>
   </section>
   <section class="sec">
     <div class="sec-h"><span class="ic">✍️</span><h2>标题</h2></div>
@@ -92,7 +97,7 @@ function renderUnlock() {
 }
 function renderHooks() {
   el('hookNote').textContent = '按商品数据' + (f.used ? ' · 含亲测款' : '');
-  const list = suggest(d.p, f.used, cfg);
+  const list = suggest(d.p, f.used, cfg, f);
   el('hooks').innerHTML = list.map(([a, b], i) => `<button data-hook="${i}">${esc(a.replace(/\n/g, ' '))}</button>`).join('');
   el('hooks').onclick = e => { const b = e.target.closest('[data-hook]'); if (!b) return; const [a, s] = list[+b.dataset.hook]; f.l1 = a; f.l2 = s; el('l1').value = a; el('l2').value = s; changed(); };
 }
@@ -160,16 +165,30 @@ el('l1').oninput = e => { f.l1 = e.target.value; changed(); };
 el('l2').oninput = e => { f.l2 = e.target.value; changed(); };
 el('rq').oninput = e => { f.review.quote = e.target.value; changed(); };
 el('ra').oninput = e => { f.review.author = e.target.value; changed(); };
-el('c1').oninput = e => { f.cap1 = e.target.value; f.cap1Manual = true; el('rebuild').hidden = false; };
-el('c2').oninput = e => { f.cap2 = e.target.value; f.cap2Manual = true; el('rebuild').hidden = false; };
-el('rebuild').onclick = () => { f.cap1Manual = f.cap2Manual = false; syncCaptions(); };
+el('c1').oninput = e => { f.cap1 = e.target.value; f.cap1Manual = true; el('rebuild').hidden = false; renderLang(); };
+el('c2').oninput = e => { f.cap2 = e.target.value; f.cap2Manual = true; el('rebuild').hidden = false; renderLang(); };
+el('rebuild').onclick = () => { f.cap1Manual = f.cap2Manual = false; syncCaptions(); renderLang(); };
 const usedBtn = el('used');
 const syncUsed = () => usedBtn.setAttribute('aria-pressed', f.used ? 'true' : 'false');
 usedBtn.onclick = () => {
   f.used = !f.used;
   /* first-person hooks only with 我用过: turning it off puts back a headline from the product data */
-  if (!f.used && isPersonal(f.l1, cfg)) { [f.l1, f.l2] = suggest(d.p, false, cfg)[0]; el('l1').value = f.l1; el('l2').value = f.l2; }
+  if (!f.used && isPersonal(f.l1)) { [f.l1, f.l2] = suggest(d.p, false, cfg, f)[0]; el('l1').value = f.l1; el('l2').value = f.l2; }
   syncUsed(); renderHooks(); changed();
+};
+
+/* 海报和文案的语言: a headline the app wrote (one of the suggestions) and captions not edited by hand follow it */
+function renderLang() {
+  const lang = langOf(cfg, f);
+  el('langs').querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+  el('langHint').textContent = (f.cap1Manual || f.cap2Manual) ? '你改过的文案不会自动换语言：点「Facebook 文案」的 ↻ 重新生成。' : '标题建议、海报上的字和 Facebook 文案都用这个语言。';
+}
+el('langs').onclick = e => {
+  const b = e.target.closest('[data-lang]'); if (!b || b.dataset.lang === langOf(cfg, f)) return;
+  const was = suggest(d.p, f.used, cfg, f).findIndex(([a, s]) => a === f.l1 && s === f.l2);
+  f.lang = b.dataset.lang;
+  if (was >= 0 || !f.l1.trim()) { const list = suggest(d.p, f.used, cfg, f); [f.l1, f.l2] = list[Math.max(0, was) % list.length]; el('l1').value = f.l1; el('l2').value = f.l2; }
+  renderLang(); renderHooks(); changed();
 };
 
 el('phs').onclick = e => {
@@ -350,7 +369,7 @@ function renderWhen() {
   el('whenHint').textContent = at ? '批准后，到这个时间自动发（1 分钟内发出，不占每天的发帖时段）。电脑或服务器要开着。'
     : `批准后排到下一个空的发帖时段（每天 ${(cfg.postTimes || []).join(' / ')}）。`;
 }
-document.querySelector('.when').onclick = e => {
+document.querySelector('[data-when]').parentNode.onclick = e => {
   const b = e.target.closest('[data-when]'); if (!b) return;
   if (b.dataset.when === 'auto') f.postAt = null;
   else if (!f.postAt) { const t = new Date(); t.setHours(t.getHours() + 2, 0, 0, 0); f.postAt = t.getTime(); }
@@ -362,4 +381,4 @@ el('postAt').onchange = () => {
   f.postAt = t; renderWhen();
 };
 
-syncUsed(); renderTps(); renderHooks(); renderPhotos(); syncCaptions(); syncDirty(); renderWhen(); renderPages(!$('.ed-pv .pvw[data-pending]')); waitPoster(); // a poster still being drawn: its pages show once it is done
+syncUsed(); renderLang(); renderTps(); renderHooks(); renderPhotos(); syncCaptions(); syncDirty(); renderWhen(); renderPages(!$('.ed-pv .pvw[data-pending]')); waitPoster(); // a poster still being drawn: its pages show once it is done

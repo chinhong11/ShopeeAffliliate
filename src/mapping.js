@@ -17,13 +17,26 @@ export const darkHex = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.sl
 export const rm = n => 'RM ' + Number(n).toFixed(2);
 const num = v => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v);
 
-/* sales → 已售 860 / 已售 1.2k+ / 已售 12k+ (zh) or 860 sold / 1.2k+ sold (mix) */
+/* poster and caption language: the draft's own (form.lang, chosen on the edit page), else config.json "language".
+   zh 中文 · ms Bahasa Melayu · mix 中英 (older setting); the review app itself stays Chinese */
+export const LANGS = { zh: '中文', ms: 'Bahasa Melayu' };
+export const langOf = (cfg, f) => { const l = (f && f.lang) || (cfg && cfg.language); return l === 'ms' || l === 'mix' ? l : 'zh'; };
+/* hashtags: one string for every language, or {"zh": "…", "ms": "…"} */
+export const tagsOf = (cfg, lang) => { const h = cfg && cfg.hashtags; return typeof h === 'string' ? h : (h && (h[lang] ?? h.zh)) || ''; };
+/* words the app itself puts on the poster */
+export const WORDS = {
+  zh: { comment: '评论区拿链接 👇', direct: '点链接直接买 🛒', buyer: '— Shopee 买家', flash: '限时闪购中', group: '好物分享群 🔥', groupSub: '群聊', t8: ['', '为什么值得买 ✅', '细节实拍 🔍', '怎么下单 👇'] },
+  ms: { comment: 'Link di komen 👇', direct: 'Klik link & beli 🛒', buyer: '— Pembeli Shopee', flash: 'Flash sale sekarang', group: 'Kongsi Barang Best 🔥', groupSub: 'Sembang kumpulan', t8: ['', 'Kenapa berbaloi ✅', 'Gambar sebenar 🔍', 'Cara beli 👇'] }
+};
+WORDS.mix = { ...WORDS.zh, comment: 'Link 在评论区 👇', direct: 'Link 在 caption 👆' };
+
+/* sales → 已售 860 / 已售 1.2k+ / 已售 12k+ (zh), 1.2k+ terjual (ms) or 1.2k+ sold (mix) */
 export function fmtSoldNum(n) {
   if (n < 1000) return String(n);
   if (n < 10000) return Math.floor(n / 100) / 10 + 'k+';
   return Math.floor(n / 1000) + 'k+';
 }
-export const fmtSold = (n, lang = 'zh') => lang === 'mix' ? fmtSoldNum(n) + ' sold' : '已售 ' + fmtSoldNum(n);
+export const fmtSold = (n, lang = 'zh') => lang === 'mix' ? fmtSoldNum(n) + ' sold' : lang === 'ms' ? fmtSoldNum(n) + ' terjual' : '已售 ' + fmtSoldNum(n);
 
 /* strip 【…】, emoji, "Ready Stock" / "COD" noise; ≤ 24 characters */
 export function shortName(s) {
@@ -68,12 +81,11 @@ export function productFromOffer(n) {
 /* draft → window.PostStudio.load() patch.
    Every field the studio defaults to a demo value is set explicitly here (empty when there is no data),
    so no placeholder survives; see placeholderProblems(). `photoSrc` maps stored photo refs → URLs. */
-export const T8_CAPS = ['', '为什么值得买 ✅', '细节实拍 🔍', '怎么下单 👇'];
 /* 在 Studio 精修 (form.look): the person's own styling, drawn over the app's; product data and photos stay the app's */
 const LOOK_STYLE = ['c1', 'c2', 'ol', 'hl', 'hlc', 'font', 'size', 'align', 'scrim', 'bg', 'ctaText', 'arrow', 'shopee', 'panel', 'accent'];
 
 export function studioState(d, cfg, photoSrc = x => x) {
-  const p = d.p, f = d.form, lang = cfg.language === 'mix' ? 'mix' : 'zh';
+  const p = d.p, f = d.form, lang = langOf(cfg, f), w = WORDS[lang];
   const photos = (f.photos || []).slice(0, 4);
   const lk = f.look || {};
   const framed = (map, ref) => { const src = photoSrc(ref), q = map && map[ref]; return q ? { src, zoom: q.zoom, x: q.x, y: q.y } : src; };
@@ -89,26 +101,26 @@ export function studioState(d, cfg, photoSrc = x => x) {
     seal: hasDisc(p) && p.disc >= 20, sealLabel: 'OFF',
     proof: hasRating(p) && p.rating >= 4.5, rate: rateOf(p), sold: fmtSold(p.sales, lang),
     voucher: !!code, voucherCode: code,
-    cta: true, ctaText: mode === 'direct' ? (lang === 'mix' ? 'Link 在 caption 👆' : '点链接直接买 🛒') : (lang === 'mix' ? 'Link 在评论区 👇' : '评论区拿链接 👇'),
+    cta: true, ctaText: w[mode],
     arrow: true, shopee: true,
     badge: true, bstyle: b.bstyle || 'lee', bInit: b.bInit || '', bName: b.bName || '', bTag: b.bTag || '', badgec: b.badgec || '#1c1c1e',
     /* never shown unless the template is chosen with real data — blanked so no demo value survives */
     cd: { h: '00', m: '00', s: '00' }, stockTxt: '', stockPct: 0,
     review: { quote: '', author: '' },
     chat: { title: '', sub: '', m1: '', m2: '', m3: '' },
-    cap: { mode, name: shortName(p.name), link: d.shortLink || '', price: rm(p.price), code, tags: cfg.hashtags || '' }
+    cap: { mode, name: shortName(p.name), link: d.shortLink || '', price: rm(p.price), code, tags: tagsOf(cfg, lang) }
   };
   if (!hasRating(p)) st.proof = false;
-  if (f.tpl === 't5') st.review = { quote: f.review.quote, author: f.review.author || '— Shopee 买家' };
+  if (f.tpl === 't5') st.review = { quote: f.review.quote, author: f.review.author || w.buyer };
   if (f.tpl === 't3') {
     st.cd = countdown(f.flash, d.now);
-    st.stockTxt = '限时闪购中';
+    st.stockTxt = w.flash;
     st.stockPct = Math.max(1, Math.min(99, +f.flash.pct || 1));
   }
-  if (f.tpl === 't4') st.chat = { title: '好物分享群 🔥', sub: '群聊', m1: f.chat.m1, m2: f.chat.m2, m3: f.chat.m3 };
+  if (f.tpl === 't4') st.chat = { title: w.group, sub: w.groupSub, m1: f.chat.m1, m2: f.chat.m2, m3: f.chat.m3 };
   if (f.tpl === 't8') st.set = { pages: photos.map((ref, i) => {
     const ph = framed(lk.pageFrames, ref);
-    return { ...(typeof ph === 'string' ? { src: ph } : ph), cap: lk.pageCaps && typeof lk.pageCaps[i] === 'string' ? lk.pageCaps[i] : T8_CAPS[i] };
+    return { ...(typeof ph === 'string' ? { src: ph } : ph), cap: lk.pageCaps && typeof lk.pageCaps[i] === 'string' ? lk.pageCaps[i] : w.t8[i] };
   }) };
   st.panel = ''; st.accent = ''; // the template's own colours unless the look (✨ AI 设计) sets them
   for (const k of LOOK_STYLE) if (lk[k] !== undefined) st[k] = lk[k];

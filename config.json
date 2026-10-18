@@ -8,7 +8,7 @@
   "linkMode": "comment",
   "brand": { "bstyle": "lee", "bInit": "L", "bName": "LIM", "bTag": "Sharing", "badgec": "#1c1c1e" },
   "voucherCode": "",
-  "hashtags": "#shopee #好物分享 #开箱",
+  "hashtags": { "zh": "#shopee #好物分享 #开箱", "ms": "#shopee #shopeemalaysia #barangviral" },
   "noRepeatDays": 30,
   "categories": [],
   "strategies": {

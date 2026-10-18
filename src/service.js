@@ -6,7 +6,7 @@ import { loadConfig, dirs } from './config.js';
 import { drafts, kv, ymd, db, dayStr, newDraftId } from './db.js';
 import { newForm, withCaptions } from './draft.js';
 import * as shopee from './shopee.js';
-import { posterKey, studioState, TPL, endAtFrom, T8_CAPS, rm } from './mapping.js';
+import { posterKey, studioState, TPL, endAtFrom, WORDS, langOf, rm } from './mapping.js';
 import { refreshCaptions, refreshHeadline, swapNumbers, availability, isPersonal, suggest } from './pick.js';
 import { renderDraft, renderState, photoDataUrl, posterFile, thumbFile } from './render.js';
 import { upcoming, dayWord, fmtTime } from './slots.js';
@@ -184,6 +184,7 @@ export function cleanForm(old, f, d = null, cfg = loadConfig()) {
     if (ph[0] === old.photos[0]) n.photos = ph; // the Shopee image stays first
   }
   if ('used' in f) n.used = !!f.used;
+  if (['zh', 'ms', 'mix'].includes(f.lang)) n.lang = f.lang; // poster and caption language
   if (f.review) n.review = { quote: str(f.review.quote, 80), author: str(f.review.author, 16) };
   if (f.flash) {
     const end = endAtFrom(f.flash.end) ? f.flash.end : '';
@@ -203,7 +204,7 @@ export function cleanForm(old, f, d = null, cfg = loadConfig()) {
   if ('postAt' in f) n.postAt = !f.postAt ? null : Number.isFinite(+f.postAt) && +f.postAt > Date.now() - 60e3 ? Math.round(+f.postAt) : (old.postAt ?? null);
   if (!own(TPL, n.tpl) || !availability(n)[n.tpl]) n.tpl = n.autoTpl; // locked templates need their real data first
   /* first-person hooks only on drafts marked 我用过 */
-  if (!n.used && d && isPersonal(n.l1, cfg)) [n.l1, n.l2] = suggest(d.p, false, cfg)[0];
+  if (!n.used && d && isPersonal(n.l1)) [n.l1, n.l2] = suggest(d.p, false, cfg, n)[0];
   return n;
 }
 
@@ -238,7 +239,7 @@ export function saveStudio(id, ch) {
   }
   if (Array.isArray(ch.pages)) {
     look.pageFrames = { ...(look.pageFrames || {}) };
-    look.pageCaps = look.pageCaps ? [...look.pageCaps] : [...T8_CAPS];
+    look.pageCaps = look.pageCaps ? [...look.pageCaps] : [...WORDS[langOf(loadConfig(), fm)].t8];
     ch.pages.forEach((q, i) => {
       if (!q) return;
       if (framed && q.zoom !== undefined && fm.photos[i]) look.pageFrames[fm.photos[i]] = { zoom: q.zoom, x: q.x, y: q.y };
@@ -414,7 +415,7 @@ export function saveManualProduct(id, b) {
   if (!['draft', 'approved'].includes(d.status)) throw new Error('这张草稿正在发布或已经处理完，不能再改了');
   const cfg = loadConfig(), o = d.p, p = { ...o, ...manualFields(b) };
   const f = { ...d.form, ...refreshHeadline(d.form, o, p, cfg) };
-  for (const k of ['cap1', 'cap2']) if (f[k + 'Manual']) f[k] = swapNumbers(f[k], o, p, cfg).split(d.shortLink).join(p.productLink);
+  for (const k of ['cap1', 'cap2']) if (f[k + 'Manual']) f[k] = swapNumbers(f[k], o, p).split(d.shortLink).join(p.productLink);
   const nd = { ...d, p, form: f, shortLink: p.productLink };
   refreshCaptions(nd, cfg);
   if (!drafts.update(id, { p, form: nd.form, shortLink: nd.shortLink }, { from: ['draft', 'approved'] })) throw new Error('这张草稿刚刚开始发布，改动没有保存');
