@@ -10,7 +10,7 @@ export const json = v => JSON.stringify(v).replace(/</g, '\\u003c');
 
 export const bag = size => `<svg viewBox="0 0 24 24" fill="none" width="${size}" height="${size}" aria-hidden="true"><path d="M5 7h14l-1 13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 7z" stroke="#fff" stroke-width="2" stroke-linejoin="round"></path><path d="M9 7a3 3 0 0 1 6 0" stroke="#fff" stroke-width="2" stroke-linecap="round"></path></svg>`;
 
-const TABS = [['queue', '待审核', '/'], ['log', '已发布', '/log'], ['stats', '数据', '/stats']];
+const TABS = [['queue', '待审核', '/'], ['log', '已发布', '/log'], ['stats', '数据', '/stats'], ['brand', '主页图', '/brand']];
 const tabButtons = (tab, count) => TABS.map(([k, l, href]) =>
   `<a role="tab" class="tab" href="${href}" aria-selected="${tab === k}">${l}${k === 'queue' && count > 0 ? `<span class="bdg">${count}</span>` : ''}</a>`).join('');
 

@@ -2,7 +2,8 @@
    - the studio opened on a draft (…v3.html?draft=<id>) → 保存到草稿: the posted poster is the studio's own export, the save
      message names what stayed the app's, the edit page reloads by itself, 用基本样式 brings the app's look back
    - a square Shopee photo is shown whole above the panel, not cropped
-   - 海报和文案的语言: Bahasa Melayu ↔ 中文 on the edit page changes the headline, captions and poster, and is saved */
+   - 海报和文案的语言: Bahasa Melayu ↔ 中文 on the edit page changes the headline, captions and poster, and is saved
+   - 主页图: the cover / profile picture preview follows the choices, 生成 gives Facebook-sized PNGs to download */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,7 +16,7 @@ fs.writeFileSync(path.join(tmp, 'config.json'), JSON.stringify({ ...cfg, categor
 Object.assign(process.env, { DATA_DIR: tmp, CONFIG_FILE: path.join(tmp, 'config.json'), SHOPEE_MOCK: '1', DISABLE_JOBS: '1', ADMIN_PASSWORD: 'pw', SESSION_SECRET: 'x'.repeat(32), GEMINI_API_KEY: '', TELEGRAM_BOT_TOKEN: '' }); // never the real keys from .env
 const { app } = await import('../src/server.js');
 const { collect } = await import('../src/collect.js');
-const { drafts } = await import('../src/db.js');
+const { drafts, kv } = await import('../src/db.js');
 const { posterFile, closeBrowser } = await import('../src/render.js');
 
 await collect({ log: () => {} });
@@ -129,6 +130,23 @@ try {
   check('中文 again: headline and captions', HAN.test(zh.l1) && zh.c1.includes('购买链接放在第一条评论'), zh);
   await p.click('#regen'); await p.waitForTimeout(300); await posterReady(); await p.waitForTimeout(500);
   check('中文 again: saved, the first poster back', form().lang === 'zh' && drafts.get(d.id).posterKey === key0, form().lang);
+
+  /* 9: 主页图: preview follows the typing, 生成 gives the Facebook-sized PNGs, the choices are kept */
+  await p.goto(B + '/brand'); await p.waitForTimeout(500);
+  const doc = id => p.$eval(`#${id} iframe`, f => f.srcdoc);
+  await p.fill('#name', 'CH Hub'); await p.click('[data-cover="dark"]'); await p.click('[data-avatar="initial"]'); await p.click('[data-lang="ms"]');
+  const pv = { cover: await doc('pvCover'), avatar: await doc('pvAvatar'), line: await p.inputValue('#line') };
+  check('主页图: preview follows the choices', pv.cover.includes('CH Hub') && pv.cover.includes('class="dark"') && pv.avatar.includes('class="initial"') && pv.line === 'Barang Shopee terbaik setiap hari', pv.line);
+  const make = async kind => {
+    await p.click(`[data-make="${kind}"]`);
+    await p.waitForFunction(k => { const i = document.getElementById('outImg'); return !document.getElementById('out').hidden && i.className === k && i.complete && i.naturalWidth; }, kind, { timeout: 120000 });
+    return p.evaluate(() => ({ w: document.getElementById('outImg').naturalWidth, h: document.getElementById('outImg').naturalHeight, dl: document.getElementById('outDl').getAttribute('href') }));
+  };
+  const cv = await make('cover'), av = await make('avatar');
+  check('主页图: 生成封面 1640×720, 生成头像 720×720, both to download', cv.w === 1640 && cv.h === 720 && av.w === 720 && av.h === 720 && /dl=1/.test(cv.dl + av.dl), { cv, av });
+  const kept = kv.get('brand:design') || {};
+  check('主页图: choices kept for next time', kept.name === 'CH Hub' && kept.cover === 'dark' && kept.lang === 'ms', kept);
+  await p.reload(); check('主页图: page opens with them', (await p.inputValue('#name')) === 'CH Hub');
   check('no page errors', !errors.length, errors);
 } finally {
   await b.close(); await closeBrowser(); srv.close();

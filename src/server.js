@@ -8,8 +8,9 @@ import { db, drafts, kv } from './db.js';
 import { isAuthed, sessionCookie, clearCookie, tryLogin } from './auth.js';
 import * as svc from './service.js';
 import { todayView } from './slots.js';
-import { posterKey, studioState, STRATS, TPL } from './mapping.js';
-import { thumbFile, viewFile, posterFile, pageFile, closeBrowser } from './render.js';
+import { posterKey, studioState, STRATS, TPL, langOf } from './mapping.js';
+import { SIZE, cleanBrand, coverHtml, avatarHtml } from './brand.js';
+import { thumbFile, viewFile, posterFile, pageFile, closeBrowser, renderHtml } from './render.js';
 import * as fb from './facebook.js';
 import * as publish from './publish.js';
 import { startJobs, stopJobs } from './jobs.js';
@@ -21,6 +22,7 @@ import { logView } from './views/log.js';
 import { statsView } from './views/stats.js';
 import { newView } from './views/new.js';
 import { designsView } from './views/designs.js';
+import { brandView } from './views/brand.js';
 import { ready as shopeeReady } from './shopee.js';
 import * as gemini from './gemini.js';
 
@@ -83,7 +85,7 @@ app.get('/studio/:file', (req, res, next) => {
   res.type('html').set('Cache-Control', 'no-store').send(html.replace('</body>', '<script type="module" src="/static/studio-bridge.js"></script>\n</body>'));
 });
 app.use('/studio', express.static(path.join(ROOT, 'studio')));
-app.get('/shared/:f', (req, res) => ['mapping.js', 'pick.js'].includes(req.params.f) ? sendFile(res, path.join(ROOT, 'src', req.params.f), 'text/javascript') : res.status(404).end());
+app.get('/shared/:f', (req, res) => ['mapping.js', 'pick.js', 'brand.js'].includes(req.params.f) ? sendFile(res, path.join(ROOT, 'src', req.params.f), 'text/javascript') : res.status(404).end());
 app.get('/posters/:f', (req, res) => {
   /* {id}.png, {id}-1..4.png (t8 pages), {id}.jpg (card), {id}-v.jpg (edit page) */
   const m = /^(d[0-9a-f]+)(?:-([1-4]|v|o[1-4]|p[1-4]))?\.(png|jpg)$/.exec(req.params.f);
@@ -129,6 +131,16 @@ app.get('/d/:id/designs', (req, res) => {
   res.send(designsView({ brand: brand(), d, count: pendingCount(), ai: gemini.enabled() }));
 });
 app.get('/new', (req, res) => res.send(newView({ brand: brand(), count: pendingCount() })));
+/* 主页图: the Page's cover and profile picture (src/brand.js), drawn like the posters; uploading them stays the person's choice */
+const brandDesign = () => cleanBrand(kv.get('brand:design') || { lang: langOf(loadConfig()) }, loadConfig().brand);
+app.get('/brand', (req, res) => res.send(brandView({ brand: brand(), count: pendingCount(), o: brandDesign(), b: loadConfig().brand, pageId: env.FB_PAGE_ID })));
+app.get('/brand/:kind.png', async (req, res, next) => {
+  const k = req.params.kind;
+  if (!SIZE[k]) return next();
+  const png = await renderHtml((k === 'cover' ? coverHtml : avatarHtml)(brandDesign()), SIZE[k]);
+  if (req.query.dl) res.attachment(`facebook-${k === 'cover' ? 'cover' : 'profile'}.png`);
+  res.type('png').set('Cache-Control', 'no-store').send(png);
+});
 
 app.get('/d/:id', (req, res) => {
   const d = drafts.get(req.params.id);
@@ -213,6 +225,7 @@ api.post('/drafts/:id/designs', wrap(async req => ({ designs: (await svc.newDesi
 const optionN = req => { const n = Number(req.params.n); if (!(Number.isInteger(n) && n >= 0 && n < 4)) throw new Error('没有这一款'); return n; };
 api.post('/drafts/:id/designs/:n/preview', wrap(async req => ({ preview: await svc.previewOption(req.params.id, optionN(req)) })));
 api.post('/drafts/:id/designs/:n/use', wrap(req => { svc.useOption(req.params.id, optionN(req)); return { ok: true }; }));
+api.post('/brand', wrap(req => { const o = cleanBrand(req.body && req.body.design, loadConfig().brand); kv.set('brand:design', o); return { design: o }; }));
 /* ✨ AI 设计海报: a new look for this draft, then its poster */
 api.post('/drafts/:id/ai-design', wrap(async req => {
   const r = await svc.designDraft(req.params.id);

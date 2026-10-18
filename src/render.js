@@ -208,6 +208,18 @@ async function renderNow(state, { set = false } = {}) {
   }
 }
 
+/* a whole HTML page of w×h CSS px (主页图: src/brand.js) → PNG at 2×, after its fonts are in; same queue as the posters */
+export const renderHtml = (html, { w, h }) => exclusive(async () => {
+  const page = await (await getBrowser()).newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+  page.setDefaultTimeout(60000);
+  try {
+    await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, fontRoute);
+    await page.setContent(html, { waitUntil: 'load' });
+    await page.evaluate(() => document.fonts.ready);
+    return await page.screenshot({ clip: { x: 0, y: 0, width: w, height: h } });
+  } finally { await page.close().catch(() => {}); }
+});
+
 /* studio state → PNG buffer(s). Fails if a studio demo value survives (placeholder guard). */
 export const renderState = (state, opts) => exclusive(() => renderNow(state, opts));
 

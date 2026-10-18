@@ -153,6 +153,16 @@ If the app stops working after a change, the file most likely has a typo. Open `
 | `brand` | The round badge on posters: `bName`, `bTag`, `bInit`, `bstyle` (`"lee"` or `"pill"`), `badgec` (colour) | `{"bName": "LEE", "bTag": "Sharing"}` |
 | `timezone` | Leave as is | `"Asia/Kuala_Lumpur"` |
 
+## Facebook cover and profile picture (主页图)
+The **主页图** tab makes a cover and a profile picture for your Page from your brand name, in 中文 or Bahasa Melayu.
+1. Pick the styles and colour, change the words if you like. The preview changes as you type.
+2. Tap **生成封面** or **生成头像**, then **⬇ 下载**. Nothing changes on Facebook by itself.
+3. If you want to use it: open your Page with the account that manages it.
+   - Cover: tap **Edit cover photo** (编辑封面照片) → **Upload photo** → pick the downloaded cover → **Save**.
+   - Profile picture: tap the camera icon on the profile picture → **Upload photo** → pick the downloaded picture → **Save**.
+
+The app can't change them for you: Facebook's API documentation doesn't show a way for apps to set a Page's cover or profile picture **(unconfirmed)**.
+
 ## If the Facebook token stops working
 You'll see the red banner 「发布已暂停 · Facebook token 有问题」 (and 🛑 in Telegram). Approved drafts stay in the queue; nothing is lost.
 
