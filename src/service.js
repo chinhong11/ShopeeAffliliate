@@ -10,7 +10,7 @@ import { posterKey, studioState, TPL, endAtFrom, WORDS, langOf, rm } from './map
 import { refreshCaptions, refreshHeadline, swapNumbers, availability, isPersonal, suggest } from './pick.js';
 import { renderDraft, renderState, photoDataUrl, posterFile, thumbFile, renderHtml } from './render.js';
 import * as fb from './facebook.js';
-import { KINDS, SIZE as CONTENT_SIZE, cleanContent, contentHtml, ready } from './content.js';
+import { KINDS, SIZE as CONTENT_SIZE, cleanContent, contentHtml, missing } from './content.js';
 import { upcoming, dayWord, fmtTime } from './slots.js';
 import { collect } from './collect.js';
 import * as gemini from './gemini.js';
@@ -481,12 +481,17 @@ export function saveContent(id, o) {
   return getContent(id);
 }
 export function deleteContent(id) {
+  const c = getContent(id);
   if (!db.prepare("DELETE FROM content WHERE id=? AND status='draft'").run(Number(id)).changes) throw new Error('已经发了的帖子不能在这里删，到 Facebook 上删');
+  if (c.data.photo) fs.rmSync(path.join(dirs.img, c.data.photo), { force: true });
 }
+/* a photo meme's picture (data:image URL, already resized in the browser) → its file name.
+   shortcut: a photo replaced before saving stays on disk; add a sweep if the img folder ever grows big */
+export const saveContentPhoto = dataUrl => writePhoto('ct-' + crypto.randomBytes(6).toString('hex'), dataUrl);
 export function contentPng(id) {
   const c = getContent(id);
   if (!c) throw new Error('这一帖不存在');
-  return renderHtml(contentHtml(c.kind, c.data), CONTENT_SIZE);
+  return renderHtml(contentHtml(c.kind, c.data, c.data.photo ? photoDataUrl(c.data.photo) : ''), CONTENT_SIZE);
 }
 export async function contentIdeas(kind, lang) {
   return (await gemini.contentIdeas(kindOf(kind), lang === 'ms' ? 'ms' : 'zh')).map(o => cleanFor(kind, { ...o, lang }));
@@ -496,7 +501,7 @@ export async function postContent(id) {
   const c = getContent(id);
   if (!c) throw new Error('这一帖不存在');
   if (pause.get()) throw new Error('发帖暂停中（看「待审核」顶部的提示），处理好了再发');
-  if (!ready(c.kind, c.data)) throw new Error(c.kind === 'meme' ? '上下两行都要写' : '标题和至少一条贴士都要写');
+  if (missing(c.kind, c.data)) throw new Error(missing(c.kind, c.data));
   const png = await contentPng(id);
   /* claim it: a second tap (or another tab) can't post it twice */
   if (!db.prepare("UPDATE content SET status='posting', error=NULL WHERE id=? AND status='draft'").run(c.id).changes) throw new Error('这一帖已经在发或发过了，刷新看看');

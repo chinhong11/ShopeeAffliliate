@@ -1,13 +1,13 @@
 /* 贴士 / 梗图 — posts that aren't products; /static/content.js previews, generates and posts them */
 import { esc, page } from './html.js';
-import { KINDS } from '../content.js';
+import { KINDS, MEME_STYLES } from '../content.js';
 import { LANGS } from '../mapping.js';
 import { fmtTime } from '../slots.js';
 import { zhDate } from './queue.js';
 
 const INTRO = {
   tip: '马来西亚人日常用得上的小贴士，做成一张卡片发到专页。不卖东西，让粉丝觉得有用、愿意分享。',
-  meme: '两行字 + emoji 的梗图，好笑、大家都懂的日常。'
+  meme: '两行字的梗图：配 emoji，或配一张照片。好笑、大家都懂的日常。'
 };
 
 export function contentView({ brand, count, kind, list, lang, b, ai, paused }) {
@@ -38,7 +38,9 @@ export function contentView({ brand, count, kind, list, lang, b, ai, paused }) {
         <section class="sec" id="editor" hidden>
           <div class="sec-h"><span class="ic">✍️</span><h2>内容</h2></div>
           ${tip ? field('title', '标题', 50) + area('points', '贴士', 5, 400, '一行一条，最多 5 条')
-    : field('top', '第一行', 60, '情况') + field('e1', '第一行 emoji', 3) + field('bottom', '第二行', 60, '反应 / 结果') + field('e2', '第二行 emoji', 3)}
+    : `<div class="field"><label>样式</label><div class="bp-seg">${Object.entries(MEME_STYLES).map(([k, v]) => `<button type="button" class="btn btn-ghost btn-sm" data-style="${k}" aria-pressed="false">${esc(v)}</button>`).join('')}</div></div>
+          <div class="field" id="photoField" hidden><label>照片 <span class="soft">自己的照片，或有权使用的图片</span></label><div class="when"><button type="button" class="btn btn-ghost" id="pickPhoto">📷 选照片</button></div><input id="photoIn" type="file" accept="image/*" hidden></div>`
+      + field('top', '第一行', 60, '情况') + field('e1', '第一行 emoji', 3) + field('bottom', '第二行', 60, '反应 / 结果') + field('e2', '第二行 emoji', 3)}
           ${area('caption', '帖子文字', 4, 1500, '发在图片上面')}
           <div class="field"><label for="accent">主色</label><div class="bp-color"><input id="accent" type="color"><span class="soft" id="accentHex"></span></div></div>
           <div class="ct-err" id="err" role="alert" hidden></div>

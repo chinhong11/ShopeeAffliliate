@@ -1,6 +1,6 @@
 /* 贴士 / 梗图: ideas → edit with a live preview (the same HTML the server draws, /shared/content.js) → 生成海报 → 发布 */
 import { api, toast } from '/static/app.js';
-import { SIZE, cleanContent, contentHtml, ready } from '/shared/content.js';
+import { SIZE, cleanContent, contentHtml, missing } from '/shared/content.js';
 
 const el = id => document.getElementById(id);
 const { kind, lang: defLang, b: brand, items } = JSON.parse(el('data').textContent);
@@ -14,6 +14,13 @@ function render() {
   const k = box.clientWidth / SIZE.w;
   fr.style.transform = `scale(${k})`; box.style.height = SIZE.h * k + 'px';
   document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === c.lang)));
+  if (kind === 'meme') {
+    const photo = c.style === 'photo';
+    document.querySelectorAll('[data-style]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.style === c.style)));
+    el('photoField').hidden = !photo;
+    for (const k of ['e1', 'e2']) el(k).closest('.field').hidden = photo;
+    el('pickPhoto').textContent = c.photo ? '📷 换照片' : '📷 选照片';
+  }
   el('accentHex').textContent = c.accent;
 }
 /* the poster shown must be the text that gets posted: any change hides it until 生成海报 again */
@@ -31,10 +38,35 @@ function load(data, itemId = null, error = '') {
 }
 for (const k of TEXTS) el(k).oninput = e => { o[k] = e.target.value; stale(); render(); };
 el('accent').oninput = e => { o.accent = e.target.value; stale(); render(); };
-el('blank').onclick = () => load({ lang: o.lang });
+el('blank').onclick = () => load({ lang: o.lang, style: o.style });
+/* photo meme: resized here (long side 2048), saved on the server, shown in the preview from /img/ */
+if (kind === 'meme') {
+  el('pickPhoto').onclick = () => el('photoIn').click();
+  el('photoIn').onchange = async e => {
+    const file = e.target.files && e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    const done = busy(el('pickPhoto'), '上传中…');
+    try {
+      const dataUrl = await new Promise((res, rej) => {
+        const im = new Image(); im.onerror = () => rej(new Error('读不了这张照片'));
+        im.onload = () => {
+          const s = Math.min(1, 2048 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+          c.width = Math.round(im.width * s); c.height = Math.round(im.height * s);
+          c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(im.src); res(c.toDataURL('image/jpeg', 0.86));
+        };
+        im.src = URL.createObjectURL(file);
+      });
+      o.photo = (await api('/content/photo', { dataUrl })).photo; stale();
+    } catch (err) { toast(err.message); }
+    done(); render();
+  };
+}
 document.addEventListener('click', e => {
   const l = e.target.closest('[data-lang]');
   if (l) { o.lang = l.dataset.lang; stale(); render(); }
+  const st = e.target.closest('[data-style]');
+  if (st) { o.style = st.dataset.style; stale(); render(); }
   const op = e.target.closest('[data-open]');
   if (op) { const c = items.find(x => String(x.id) === op.dataset.open); if (c) load(c.data, c.id, c.error); }
 });
@@ -68,7 +100,8 @@ const save = async () => {
 const busy = (b, text) => { const label = b.textContent; b.disabled = true; b.textContent = text; return () => { b.disabled = false; b.textContent = label; }; };
 
 el('make').onclick = async () => {
-  if (!ready(kind, cleanContent(kind, o, brand))) return toast(kind === 'meme' ? '上下两行都要写' : '标题和至少一条贴士都要写');
+  const why = missing(kind, cleanContent(kind, o, brand));
+  if (why) return toast(why);
   const done = busy(el('make'), '生成中…'), img = el('outImg');
   try {
     await save();

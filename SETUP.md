@@ -170,7 +170,7 @@ The **主页图** tab makes a cover and a profile picture for your Page from you
 The app can't change them for you: Facebook's API documentation doesn't show a way for apps to set a Page's cover or profile picture **(unconfirmed)**.
 
 ## Tips and memes (贴士 / 梗图)
-Two tabs for posts that don't sell anything: a daily-life tip card, or a two-line meme with emoji.
+Two tabs for posts that don't sell anything: a daily-life tip card, or a two-line meme with emoji or with a photo (样式: **文字 + emoji** or **照片**, then **📷 选照片**; use your own photo or one you have the right to use).
 1. Pick the language. Tap **✨ Gemini 出 4 个点子** (needs the Gemini key above) and **用这个** on one, or tap **自己写**.
 2. Change the words and the post text. The preview changes as you type.
 3. Tap **生成海报** to see the real picture. Any change after that hides it until you tap 生成海报 again.

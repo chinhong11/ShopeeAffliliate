@@ -175,6 +175,17 @@ try {
   check('梗图: a change hides the poster until 生成 again', await p.$eval('#out', o => o.hidden));
   await p.reload();
   check('梗图: saved as a draft', (await p.$$eval('[data-open]', l => l.map(x => x.textContent))).some(t => t.includes('Gaji masuk / Gaji keluar <b>')));
+  /* 11: 梗图 with a photo: pick 照片, upload, the preview and the PNG use it */
+  await p.click('#blank'); await p.click('[data-style="photo"]');
+  check('梗图: 照片 hides the emoji fields, shows the photo picker', await p.evaluate(() => !document.getElementById('photoField').hidden && document.getElementById('e1').closest('.field').hidden));
+  await p.setInputFiles('#photoIn', new URL('../design/review-photos/p-ramen1.jpg', import.meta.url).pathname);
+  await p.waitForFunction(() => document.querySelector('#pv iframe').srcdoc.includes('/img/ct-'), null, { timeout: 30000 });
+  await p.fill('#top', 'Bila gaji masuk');
+  await p.click('#make');
+  await p.waitForFunction(() => { const i = document.getElementById('outImg'); return !document.getElementById('out').hidden && i.complete && i.naturalWidth; }, null, { timeout: 120000 });
+  const pm = await p.evaluate(() => { const i = document.getElementById('outImg'), c = document.createElement('canvas'); c.width = 1080; c.height = 1080; const x = c.getContext('2d'); x.drawImage(i, 0, 0);
+    const d = x.getImageData(540, 700, 1, 1).data; return { w: i.naturalWidth, rgb: [...d.slice(0, 3)], pv: document.querySelector('#pv iframe').contentDocument.querySelector('img.ph').naturalWidth }; });
+  check('梗图: photo in the preview and in the 1080×1080 PNG (not the empty dark card)', pm.w === 1080 && pm.pv > 0 && pm.rgb.some(v => Math.abs(v - 28) > 20), pm);
   check('no page errors', !errors.length, errors);
 } finally {
   await b.close(); await closeBrowser(); srv.close();

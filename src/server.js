@@ -281,6 +281,7 @@ api.post('/token', wrap(async () => {
   return { ok: false, error: r.problems.join('；') };
 }));
 api.post('/content/ideas', wrap(async req => ({ ideas: await svc.contentIdeas(req.body && req.body.kind, req.body && req.body.lang) })));
+api.post('/content/photo', wrap(req => ({ photo: svc.saveContentPhoto(req.body && req.body.dataUrl) })));
 api.post('/content', wrap(req => ({ item: svc.newContent(req.body && req.body.kind, req.body && req.body.data) })));
 api.post('/content/:id', wrap(req => ({ item: svc.saveContent(req.params.id, req.body && req.body.data) })));
 api.post('/content/:id/post', wrap(async req => ({ item: await svc.postContent(req.params.id) })));

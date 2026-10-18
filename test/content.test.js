@@ -45,8 +45,11 @@ test('fields are checked: short texts, at most 5 points, a #rrggbb colour, the b
   assert.deepEqual(t.points, ['x', 'y', 'z', '1', '2']);
   assert.deepEqual([t.accent, t.lang, t.name, t.extra], ['#ee4d2d', 'zh', 'LIM', undefined]);
   const m = C.cleanContent('meme', { top: 'a', e1: '🤣🤣🤣🤣', lang: 'ms' });
-  assert.deepEqual([m.e1, m.e2, m.lang, C.ready('meme', m)], ['🤣🤣🤣', '🫠', 'ms', false]);
-  assert.ok(C.ready('tip', t));
+  assert.deepEqual([m.e1, m.e2, m.lang, m.style, C.missing('meme', m)], ['🤣🤣🤣', '🫠', 'ms', 'text', '上下两行都要写']);
+  assert.equal(C.missing('tip', t), '');
+  const ph = C.cleanContent('meme', { style: 'photo', top: 'a', photo: '../../etc/passwd' });
+  assert.deepEqual([ph.style, ph.photo, C.missing('meme', ph)], ['photo', '', '要有照片和至少一行字']);
+  assert.equal(C.missing('meme', { ...ph, photo: 'ct-0123456789ab.jpg' }), '');
 });
 
 test('words go into the picture as text, never as HTML', () => {
@@ -91,6 +94,20 @@ test('save → 1080×1080 PNG → post once; then it can no longer be changed, d
   assert.match((await post(`/content/${item.id}`, { data: { title: 'x' } })).error, /已经发了/);
   assert.match((await post(`/content/${item.id}/delete`, {})).error, /不能在这里删/);
   assert.match((await post(`/content/${item.id}/post`, {})).error, /已经在发或发过了/);
+});
+
+test('photo meme: the upload is saved, a 1080×1080 PNG, deleting the draft removes the photo', async () => {
+  const red = await (await import('../src/render.js')).renderHtml('<div style="width:40px;height:40px;background:#f00"></div>', { w: 40, h: 40 });
+  assert.match((await post('/content/photo', { dataUrl: 'data:text/html;base64,PGI+' })).error, /照片格式不对/);
+  const { photo } = await post('/content/photo', { dataUrl: 'data:image/png;base64,' + red.toString('base64') });
+  assert.match(photo, /^ct-[0-9a-f]{12}\.png$/);
+  const { item } = await post('/content', { kind: 'meme', data: { style: 'photo', photo, top: 'Bila gaji masuk' } });
+  assert.equal(item.data.photo, photo);
+  const png = Buffer.from(await (await get(`/content/${item.id}.png`)).arrayBuffer());
+  assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1080, 1080]);
+  assert.ok(fs.existsSync(path.join(tmp, 'img', photo)));
+  assert.equal((await post(`/content/${item.id}/delete`, {})).status, 200);
+  assert.ok(!fs.existsSync(path.join(tmp, 'img', photo)));
 });
 
 test('a Facebook error leaves it a draft with the reason; a token error pauses; a paused page refuses to post', async () => {
