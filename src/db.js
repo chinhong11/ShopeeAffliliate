@@ -66,6 +66,15 @@ CREATE TABLE IF NOT EXISTS conversions (
   purchase_time INTEGER, sub_ids TEXT, strategy TEXT, tpl TEXT, layout INTEGER, draft_id TEXT,
   orders INTEGER, commission REAL, raw_key TEXT UNIQUE
 );
+
+CREATE TABLE IF NOT EXISTS content (   -- 贴士 / 梗图 posts (src/content.js)
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,                -- tip | meme
+  status TEXT NOT NULL DEFAULT 'draft', -- draft | posting | posted
+  data TEXT NOT NULL,                -- JSON (cleanContent)
+  fb_post_id TEXT, permalink TEXT, error TEXT,
+  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, posted_at INTEGER
+);
 `);
 
 /* migrations for databases created by earlier builds */

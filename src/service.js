@@ -8,7 +8,9 @@ import { newForm, withCaptions } from './draft.js';
 import * as shopee from './shopee.js';
 import { posterKey, studioState, TPL, endAtFrom, WORDS, langOf, rm } from './mapping.js';
 import { refreshCaptions, refreshHeadline, swapNumbers, availability, isPersonal, suggest } from './pick.js';
-import { renderDraft, renderState, photoDataUrl, posterFile, thumbFile } from './render.js';
+import { renderDraft, renderState, photoDataUrl, posterFile, thumbFile, renderHtml } from './render.js';
+import * as fb from './facebook.js';
+import { KINDS, SIZE as CONTENT_SIZE, cleanContent, contentHtml, ready } from './content.js';
 import { upcoming, dayWord, fmtTime } from './slots.js';
 import { collect } from './collect.js';
 import * as gemini from './gemini.js';
@@ -461,3 +463,54 @@ export const onReminder = fn => reminderListeners.push(fn);
 export const remind = r => fire(reminderListeners, r);
 
 export const logRows = (days = 30) => db.prepare("SELECT * FROM posts WHERE at>=? AND kind<>'deleted' ORDER BY at DESC").all(Date.now() - days * 86400e3);
+
+/* ---------- 贴士 / 梗图: written (or picked from Gemini's ideas) on their own tabs, posted only when the person taps 发布 ---------- */
+const kindOf = k => { if (!KINDS[k]) throw new Error('不认识的类型'); return k; };
+const crow = r => r && { id: r.id, kind: r.kind, status: r.status, data: JSON.parse(r.data), postId: r.fb_post_id, permalink: r.permalink, error: r.error, createdAt: r.created_at, postedAt: r.posted_at };
+export const getContent = id => crow(db.prepare('SELECT * FROM content WHERE id=?').get(Number(id)));
+export const listContent = kind => db.prepare("SELECT * FROM content WHERE kind=? ORDER BY status='posted', COALESCE(posted_at, updated_at) DESC LIMIT 60").all(kindOf(kind)).map(crow);
+const cleanFor = (kind, o) => cleanContent(kind, o, loadConfig().brand);
+export function newContent(kind, o) {
+  const now = Date.now();
+  return getContent(db.prepare('INSERT INTO content(kind,data,created_at,updated_at) VALUES(?,?,?,?)').run(kindOf(kind), JSON.stringify(cleanFor(kind, o)), now, now).lastInsertRowid);
+}
+export function saveContent(id, o) {
+  const c = getContent(id);
+  if (!c) throw new Error('这一帖不存在');
+  if (!db.prepare("UPDATE content SET data=?, updated_at=? WHERE id=? AND status='draft'").run(JSON.stringify(cleanFor(c.kind, o)), Date.now(), c.id).changes) throw new Error('这一帖已经发了，不能再改');
+  return getContent(id);
+}
+export function deleteContent(id) {
+  if (!db.prepare("DELETE FROM content WHERE id=? AND status='draft'").run(Number(id)).changes) throw new Error('已经发了的帖子不能在这里删，到 Facebook 上删');
+}
+export function contentPng(id) {
+  const c = getContent(id);
+  if (!c) throw new Error('这一帖不存在');
+  return renderHtml(contentHtml(c.kind, c.data), CONTENT_SIZE);
+}
+export async function contentIdeas(kind, lang) {
+  return (await gemini.contentIdeas(kindOf(kind), lang === 'ms' ? 'ms' : 'zh')).map(o => cleanFor(kind, { ...o, lang }));
+}
+/* 发布: right away, not in the daily slots and not counted in postsPerDay */
+export async function postContent(id) {
+  const c = getContent(id);
+  if (!c) throw new Error('这一帖不存在');
+  if (pause.get()) throw new Error('发帖暂停中（看「待审核」顶部的提示），处理好了再发');
+  if (!ready(c.kind, c.data)) throw new Error(c.kind === 'meme' ? '上下两行都要写' : '标题和至少一条贴士都要写');
+  const png = await contentPng(id);
+  /* claim it: a second tap (or another tab) can't post it twice */
+  if (!db.prepare("UPDATE content SET status='posting', error=NULL WHERE id=? AND status='draft'").run(c.id).changes) throw new Error('这一帖已经在发或发过了，刷新看看');
+  let post;
+  try { post = await fb.postPhoto(png, c.data.caption); }
+  catch (e) {
+    const fatal = e instanceof fb.FbError && e.fatal;
+    if (fatal) pause.set(e.code, pauseText(e.code), undefined, fbWords(e.message));
+    const msg = e instanceof fb.FbError && e.status === 599 ? `连接 Facebook 时网络中断（${e.message}）。帖子可能已经发出去了：先到专页看看，没有再发一次。` : e.message;
+    db.prepare("UPDATE content SET status='draft', error=? WHERE id=?").run(msg, c.id);
+    throw new Error(msg);
+  }
+  const postId = post.post_id || post.id;
+  db.prepare("UPDATE content SET status='posted', fb_post_id=?, posted_at=? WHERE id=?").run(postId, Date.now(), c.id); // recorded first: never a second post
+  db.prepare('UPDATE content SET permalink=? WHERE id=?').run(await fb.permalink(postId), c.id);
+  return getContent(id);
+}

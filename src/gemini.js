@@ -185,6 +185,38 @@ export async function designs(d, photo, fetchImpl = fetch) {
   return list;
 }
 
+/* ---------- 贴士 / 梗图: 4 ideas for a post that isn't a product ---------- */
+const IDEA = {
+  tip: { type: 'OBJECT', required: ['title', 'points', 'caption'], properties: { title: S, points: { type: 'ARRAY', items: S }, caption: S } },
+  meme: { type: 'OBJECT', required: ['top', 'bottom', 'e1', 'e2', 'caption'], properties: { top: S, bottom: S, e1: S, e2: S, caption: S } }
+};
+export function ideasPrompt(kind, lang, now = Date.now()) {
+  const ms = lang === 'ms';
+  const what = kind === 'meme'
+    ? `4 个两行的文字梗图（不用图片）：top 是「情况」（20 字以内），bottom 是「反应 / 结果」（20 字以内），e1 / e2 各一个配合的 emoji。
+笑点要来自大家都懂的日常：塞车、天气热、下大雨、发薪日前、月底、打包食物、mamak、Grab、Shopee 半夜刷、双11 / 12.12 大促、开斋节或新年回乡、学校假期、老板的 WhatsApp。轻松好笑，不要嘲笑任何群体。`
+    : `4 个实用的生活小贴士：title 是标题（16 字以内），points 是 3 到 4 条具体的做法（每条 30 字以内），要真的能马上用。
+题目选马来西亚人日常最关心的：省钱、省电费 / 水费、天气热或雨季怎么办、塞车和通勤、网购防骗、食物保存、家里清洁、小孩上学、健康小习惯（只说常识，不做医疗建议）。`;
+  return `你在帮一个马来西亚的 Facebook 专页（平时分享 Shopee 好物）写不卖东西的日常帖子，让粉丝觉得有用或好笑、愿意分享。
+今天是 ${dayStr(now)}，可以配合这个时候的季节、节日或大促，但不确定的事就不要提。
+写 ${what}
+caption：帖子正文，2 到 4 行，自然亲切，可以用 emoji，最后可以问粉丝一个简单的问题，不要 hashtag，不要网址，不要卖东西。
+规则：不碰宗教、种族、皇室和政治（3R）；不编造数字、价格、统计、新闻、政府政策或优惠；不确定的不写。
+${ms ? '全部用马来文写（Bahasa Melayu，马来西亚 Facebook 上轻松自然的口语，可以夹一点常用英文，不要用中文）。' : '全部用简体中文写（马来西亚华人的口吻）。'}
+4 个点子的题目要不一样，放在 ideas 里。`;
+}
+export async function contentIdeas(kind, lang, fetchImpl = fetch) {
+  if (!enabled()) throw new Error('还没设置 GEMINI_API_KEY（在 Google AI Studio 免费申请）');
+  const body = { contents: [{ role: 'user', parts: [{ text: ideasPrompt(kind, lang) }] }], generationConfig: { temperature: 1, responseMimeType: 'application/json',
+    responseSchema: { type: 'OBJECT', required: ['ideas'], properties: { ideas: { type: 'ARRAY', items: IDEA[kind] } } } } };
+  const out = await ask(body, fetchImpl, kind);
+  /* any address the model wrote anyway is dropped */
+  const list = (Array.isArray(out.ideas) ? out.ideas : []).slice(0, 4).filter(o => o && typeof o === 'object')
+    .map(o => ({ ...o, caption: String(o.caption || '').replace(/https?:\/\/\S+/g, '').trim() }));
+  if (!list.length) throw new Error('Gemini 没有给出点子，再试一次');
+  return list;
+}
+
 /* ---------- which model, and its limits (chosen on 数据; Google shows free-tier limits only in AI Studio) ---------- */
 export const model = () => kv.get('gemini:choice') || env.GEMINI_MODEL;
 /* limits typed in on 数据 or learned from a 429; 3.8 Flash from AI Studio on 2026-10-17 */

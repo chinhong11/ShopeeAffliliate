@@ -162,6 +162,19 @@ try {
   const kept = kv.get('brand:design') || {};
   check('主页图: choices kept for next time', kept.name === 'CH Hub' && kept.cover === 'dark' && kept.lang === 'ms', kept);
   await p.reload(); check('主页图: page opens with them', (await p.inputValue('#name')) === 'CH Hub');
+  /* 10: 梗图: write one, the preview follows, 生成海报 → 1080×1080, then 发布 shows; any change hides it again */
+  await p.goto(B + '/memes'); await p.click('#blank'); await p.click('[data-lang="ms"]');
+  await p.fill('#top', 'Gaji masuk'); await p.fill('#bottom', 'Gaji keluar <b>');
+  const mv = await p.$eval('#pv iframe', f => f.srcdoc);
+  check('梗图: preview follows the typing, words as text', mv.includes('Gaji masuk') && mv.includes('Gaji keluar &lt;b&gt;') && mv.includes('class="meme"'));
+  await p.click('#make');
+  await p.waitForFunction(() => { const i = document.getElementById('outImg'); return !document.getElementById('out').hidden && i.complete && i.naturalWidth; }, null, { timeout: 120000 });
+  const mp = await p.evaluate(() => ({ w: outImg.naturalWidth, h: outImg.naturalHeight, post: !document.getElementById('post').hidden, del: !document.getElementById('del').hidden }));
+  check('梗图: 生成海报 1080×1080, 发布 and 删除 there', mp.w === 1080 && mp.h === 1080 && mp.post && mp.del, mp);
+  await p.fill('#top', 'Gaji masuk!');
+  check('梗图: a change hides the poster until 生成 again', await p.$eval('#out', o => o.hidden));
+  await p.reload();
+  check('梗图: saved as a draft', (await p.$$eval('[data-open]', l => l.map(x => x.textContent))).some(t => t.includes('Gaji masuk / Gaji keluar <b>')));
   check('no page errors', !errors.length, errors);
 } finally {
   await b.close(); await closeBrowser(); srv.close();

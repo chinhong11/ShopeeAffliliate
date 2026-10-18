@@ -169,6 +169,15 @@ The **主页图** tab makes a cover and a profile picture for your Page from you
 
 The app can't change them for you: Facebook's API documentation doesn't show a way for apps to set a Page's cover or profile picture **(unconfirmed)**.
 
+## Tips and memes (贴士 / 梗图)
+Two tabs for posts that don't sell anything: a daily-life tip card, or a two-line meme with emoji.
+1. Pick the language. Tap **✨ Gemini 出 4 个点子** (needs the Gemini key above) and **用这个** on one, or tap **自己写**.
+2. Change the words and the post text. The preview changes as you type.
+3. Tap **生成海报** to see the real picture. Any change after that hides it until you tap 生成海报 again.
+4. Tap **发布到 Facebook** to post it now, or leave it as a draft (it stays in 草稿), or **删除** it.
+
+These post straight away: they don't use the daily posting times or count toward posts per day. Read Gemini's ideas before posting; it is told to avoid religion, race, royalty and politics and not to make up numbers, but check anyway.
+
 ## If the Facebook token stops working
 You'll see the red banner 「发布已暂停 · Facebook token 有问题」 (and 🛑 in Telegram). Approved drafts stay in the queue; nothing is lost.
 

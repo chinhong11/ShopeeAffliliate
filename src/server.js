@@ -23,6 +23,7 @@ import { statsView } from './views/stats.js';
 import { newView } from './views/new.js';
 import { designsView } from './views/designs.js';
 import { brandView } from './views/brand.js';
+import { contentView } from './views/content.js';
 import { ready as shopeeReady } from './shopee.js';
 import { H2I_FILE } from './static.js';
 import * as gemini from './gemini.js';
@@ -87,7 +88,7 @@ app.get('/studio/:file', (req, res, next) => {
   res.type('html').set('Cache-Control', 'no-store').send(html.replace('</body>', '<script type="module" src="/static/studio-bridge.js"></script>\n</body>'));
 });
 app.use('/studio', express.static(path.join(ROOT, 'studio')));
-app.get('/shared/:f', (req, res) => ['mapping.js', 'pick.js', 'brand.js'].includes(req.params.f) ? sendFile(res, path.join(ROOT, 'src', req.params.f), 'text/javascript') : res.status(404).end());
+app.get('/shared/:f', (req, res) => ['mapping.js', 'pick.js', 'brand.js', 'content.js'].includes(req.params.f) ? sendFile(res, path.join(ROOT, 'src', req.params.f), 'text/javascript') : res.status(404).end());
 app.get('/posters/:f', (req, res) => {
   /* {id}.png, {id}-1..4.png (t8 pages), {id}.jpg (card), {id}-v.jpg (edit page) */
   const m = /^(d[0-9a-f]+)(?:-([1-4]|v|o[1-4]|p[1-4]))?\.(png|jpg)$/.exec(req.params.f);
@@ -142,6 +143,16 @@ app.get('/brand/:kind.png', async (req, res, next) => {
   const png = await renderHtml((k === 'cover' ? coverHtml : avatarHtml)(brandDesign()), SIZE[k]);
   if (req.query.dl) res.attachment(`facebook-${k === 'cover' ? 'cover' : 'profile'}.png`);
   res.type('png').set('Cache-Control', 'no-store').send(png);
+});
+
+/* 贴士 / 梗图: posts that aren't products (src/content.js), posted only when 发布 is tapped */
+for (const [path_, kind] of [['/tips', 'tip'], ['/memes', 'meme']]) app.get(path_, (req, res) => {
+  const cfg = loadConfig();
+  res.send(contentView({ brand: brand(), count: pendingCount(), kind, list: svc.listContent(kind), lang: langOf(cfg), b: cfg.brand, ai: gemini.enabled(), paused: !!svc.pause.get() }));
+});
+app.get('/content/:id.png', async (req, res, next) => {
+  if (!svc.getContent(req.params.id)) return next();
+  res.type('png').set('Cache-Control', 'no-store').send(await svc.contentPng(req.params.id));
 });
 
 app.get('/d/:id', (req, res) => {
@@ -269,6 +280,11 @@ api.post('/token', wrap(async () => {
   svc.pause.set(190, svc.pauseText(190, r.problems), 'token', svc.fbWords(r.detail));
   return { ok: false, error: r.problems.join('；') };
 }));
+api.post('/content/ideas', wrap(async req => ({ ideas: await svc.contentIdeas(req.body && req.body.kind, req.body && req.body.lang) })));
+api.post('/content', wrap(req => ({ item: svc.newContent(req.body && req.body.kind, req.body && req.body.data) })));
+api.post('/content/:id', wrap(req => ({ item: svc.saveContent(req.params.id, req.body && req.body.data) })));
+api.post('/content/:id/post', wrap(async req => ({ item: await svc.postContent(req.params.id) })));
+api.post('/content/:id/delete', wrap(req => svc.deleteContent(req.params.id)));
 api.post('/posts/:id/retry', wrap(req => publish.retryPost(Number(req.params.id))));
 api.post('/posts/:id/delete', wrap(req => publish.deletePosted(Number(req.params.id))));
 app.use('/api', api);
