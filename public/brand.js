@@ -36,9 +36,11 @@ document.addEventListener('click', e => {
   render();
 });
 /* 生成: save the choices, then the server draws the PNG (a few seconds) */
-document.querySelectorAll('[data-make]').forEach(b => b.onclick = async () => {
+/* one at a time: both share the result image, so a second tap would leave the first waiting forever */
+const makers = document.querySelectorAll('[data-make]');
+makers.forEach(b => b.onclick = async () => {
   const kind = b.dataset.make, img = el('outImg');
-  b.disabled = true; const label = b.textContent; b.textContent = '生成中…';
+  makers.forEach(x => { x.disabled = true; }); const label = b.textContent; b.textContent = '生成中…';
   try {
     await api('/brand', { design: o });
     const url = `/brand/${kind}.png?t=${Date.now()}`;
@@ -49,7 +51,7 @@ document.querySelectorAll('[data-make]').forEach(b => b.onclick = async () => {
     el('out').hidden = false;
     el('out').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch (err) { toast(err.message); }
-  b.disabled = false; b.textContent = label;
+  makers.forEach(x => { x.disabled = false; }); b.textContent = label;
 });
 addEventListener('resize', render);
 render();

@@ -2,7 +2,7 @@
    The link is never left to the model: it writes {link} and the real affiliate link goes in here. */
 import { env } from './config.js';
 import { kv, dayStr } from './db.js';
-import { rm, shortName, wasOf, pctOf, rateOf, fmtSold, hasDisc, hasRating, langOf, tagsOf } from './mapping.js';
+import { rm, shortName, wasOf, pctOf, rateOf, fmtSold, hasDisc, hasRating, langOf, tagsOf, contrast, darkHex } from './mapping.js';
 import { COMMENT_MS } from './pick.js';
 
 export const enabled = () => !!env.GEMINI_API_KEY;
@@ -140,14 +140,13 @@ export function designPrompt(d) {
 - why：一句话（简体中文，20 字以内）说明这个设计的想法`;
 }
 
-const lum = h => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
-export const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+export { contrast };
 
 /* the model's answer → { tpl, look, why }, every value checked; unreadable colours replaced */
 export function cleanDesign(o) {
   o = o && typeof o === 'object' ? o : {};
   const look = {}, panel = HEX.test(o.panel) ? o.panel.toLowerCase() : '';
-  const ink = panel && lum(panel) < 0.4 ? '#ffffff' : '#1c1c1e';
+  const ink = panel && darkHex(panel) ? '#ffffff' : '#1c1c1e'; // the same rule as the poster's bar text (mapping.js)
   if (panel) look.panel = panel;
   if (HEX.test(o.accent) && contrast(o.accent, '#ffffff') >= 3) look.accent = o.accent.toLowerCase();
   const bg = panel || '#ffffff';

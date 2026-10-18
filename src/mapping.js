@@ -12,8 +12,11 @@ export const GRID_TPLS = ['t1', 't2', 't3', 't5', 't6'];
 /* photo on top, words in a panel underneath (studio-canvas-v3.css): there is always room for the price */
 export const PANEL = ['t1', 't2', 't6'];
 
-/* is this #rrggbb dark (the text on it should be white)? */
-export const darkHex = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); return 0.299 * r + 0.587 * g + 0.114 * b < 128; };
+/* WCAG contrast of two #rrggbb colours (1–21) */
+const lum = h => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+export const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+/* should text on this #rrggbb be white? Whichever of white / near-black reads better (over 4:1 for every colour) */
+export const darkHex = h => contrast('#ffffff', h) > contrast('#1c1c1e', h);
 export const rm = n => 'RM ' + Number(n).toFixed(2);
 const num = v => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v);
 

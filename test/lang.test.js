@@ -119,6 +119,8 @@ test('new numbers before posting: Malay headline rebuilt, hand-written Malay tex
   const f = draft('ms').form;
   assert.deepEqual(refreshHeadline(f, o, n, cfg), { l1: 'Harga dah\njatuh teruk!', l2: 'Sekarang RM 17.50 je' });
   assert.equal(swapNumbers('Cuma RM 19.90, rating 4.7, 2.1k+ terjual', o, n), 'Cuma RM 17.50, rating 4.8, 3.2k+ terjual');
+  /* one pass: RM 10 → RM 20 at the same 50 % off, while the old 原价 was RM 20 — never RM 40 twice */
+  assert.equal(swapNumbers('现在 RM 10.00（原价 RM 20.00）', P({ price: 10, disc: 50 }), P({ price: 20, disc: 50 })), '现在 RM 20.00（原价 RM 40.00）');
 });
 
 test('✨ AI 写文案 asks for Malay on a Malay draft, with the Malay link line; Chinese drafts as before', () => {

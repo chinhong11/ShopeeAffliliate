@@ -129,6 +129,14 @@ try {
   await p.click('#regen'); await p.waitForTimeout(300); await posterReady(); await p.waitForTimeout(500);
   check('中文 again: saved, the first poster back', form().lang === 'zh' && drafts.get(d.id).posterKey === key0, form().lang);
 
+  /* 8b: the same draft open in two tabs (phone + laptop): each tab's autosave keeps the other's saved edit */
+  const q = await ctx.newPage(); q.on('pageerror', e => errors.push('tab B: ' + e.message));
+  await q.goto(B + '/d/' + d.id); await q.waitForSelector('#l2');
+  const saved = pg => pg.waitForFunction(() => /已保存/.test(document.getElementById('sv').textContent), null, { timeout: 30000 });
+  await p.fill('#l1', 'Tab A 标题'); await saved(p);
+  await q.fill('#l2', 'Tab B 副标题'); await saved(q); await q.waitForTimeout(2000); await q.close();
+  check('two tabs: both saved edits kept', form().l1 === 'Tab A 标题' && form().l2 === 'Tab B 副标题', { l1: form().l1, l2: form().l2 });
+
   /* 9: 主页图: preview follows the typing, 生成 gives the Facebook-sized PNGs, the choices are kept */
   await p.goto(B + '/brand'); await p.waitForTimeout(500);
   const doc = id => p.$eval(`#${id} iframe`, f => f.srcdoc);
@@ -141,6 +149,10 @@ try {
     return p.evaluate(() => ({ w: document.getElementById('outImg').naturalWidth, h: document.getElementById('outImg').naturalHeight, dl: document.getElementById('outDl').getAttribute('href') }));
   };
   const cv = await make('cover'), av = await make('avatar');
+  await p.click('[data-make="cover"]');
+  const allOff = await p.evaluate(() => [...document.querySelectorAll('[data-make]')].every(b => b.disabled));
+  await p.waitForFunction(() => [...document.querySelectorAll('[data-make]')].every(b => !b.disabled && !/生成中/.test(b.textContent)), null, { timeout: 120000 });
+  check('主页图: one 生成 at a time, both buttons back after', allOff);
   check('主页图: 生成封面 1640×720, 生成头像 720×720, both to download', cv.w === 1640 && cv.h === 720 && av.w === 720 && av.h === 720 && /dl=1/.test(cv.dl + av.dl), { cv, av });
   const kept = kv.get('brand:design') || {};
   check('主页图: choices kept for next time', kept.name === 'CH Hub' && kept.cover === 'dark' && kept.lang === 'ms', kept);

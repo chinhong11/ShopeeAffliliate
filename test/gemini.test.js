@@ -48,6 +48,13 @@ test('AI design: answer checked field by field, unreadable colours replaced, pho
   assert.equal(bad.tpl, 't1');                                       // only the panel templates
   assert.deepEqual(bad.look, { c1: '#1c1c1e', c2: '#1c1c1e', hl: false }); // no panel → white: light text replaced; pale accent dropped
   assert.ok(gemini.contrast('#ffffff', '#000000') > 20);
+  /* a mid-tone panel: the replacement text is the colour that reads, and the same one the poster's bar uses */
+  const { darkHex } = await import('../src/mapping.js');
+  for (const panel of ['#a0a0a0', '#e07a5f', '#4fa3d1', '#00d70f']) {
+    const lk = gemini.cleanDesign({ tpl: 't1', panel, c1: panel, c2: panel }).look;
+    assert.ok(gemini.contrast(lk.c2, panel) >= 3, `${panel}: ${lk.c2}`);
+    assert.equal(lk.c2 === '#ffffff', darkHex(panel), panel);
+  }
 
   const f = reply({ candidates: [{ content: { parts: [{ text: JSON.stringify({ tpl: 't2', panel: '#fff7ec', accent: '#b91c1c', c1: '#7c2d12', c2: '#57534e', font: 'rounded', align: 'center', marker: true, markerColor: '#fde047', why: '暖色配泡面' }) }] } }] });
   const r = await gemini.design(d, { buf: Buffer.from('jpegbytes'), type: 'image/jpeg' }, f);

@@ -9,6 +9,8 @@ const { d, cfg } = JSON.parse($('#data').textContent);
 const f = JSON.parse(JSON.stringify(d.form));
 const draft = () => ({ ...d, form: f });
 let savedForm = JSON.stringify(d.form);
+/* only what changed since the last save: another tab or device editing the same draft keeps its own changes */
+const changes = (snap = JSON.stringify(f)) => { const o = JSON.parse(savedForm); return Object.fromEntries(Object.entries(JSON.parse(snap)).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(o[k]))); };
 let savedKey = d.posterKey || posterKey({ ...d, form: d.form }, cfg);
 let unlock = null, busy = false;
 const direct = cfg.linkMode === 'direct';
@@ -217,7 +219,7 @@ el('file').onchange = async e => {
 
 async function save(render) {
   const snap = JSON.stringify(f); // what this request saves; edits made while it runs are saved by the next one
-  const r = await api(`/drafts/${d.id}/save`, { form: JSON.parse(snap), render });
+  const r = await api(`/drafts/${d.id}/save`, { form: changes(snap), render });
   savedForm = snap;
   if (render) { savedKey = r.posterKey; if (r.posterError) throw new Error(r.posterError); }
   return r;
@@ -250,7 +252,7 @@ async function leave(href) {
 /* phone back gesture, closing the tab, switching apps: send what's left (keepalive survives the page) */
 const flush = () => {
   if (reloading || !unsaved()) return;
-  fetch(`/api/drafts/${d.id}/save`, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'rv' }, body: JSON.stringify({ form: f, render: false, queue: true }) }).catch(() => {});
+  fetch(`/api/drafts/${d.id}/save`, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'rv' }, body: JSON.stringify({ form: changes(), render: false, queue: true }) }).catch(() => {});
 };
 addEventListener('pagehide', flush);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
@@ -275,10 +277,11 @@ el('approve').onclick = async () => {
   if (posterKey(draft(), cfg) !== savedKey) setPoster('busy');
   try {
     const snap = JSON.stringify(f);
-    let r = await api(`/drafts/${d.id}/approve`, { form: JSON.parse(snap) });
+    const form = changes(snap);
+    let r = await api(`/drafts/${d.id}/approve`, { form });
     if (r.confirm) {
       if (!confirm(r.confirm)) { busy = false; syncDirty(); setPoster('none'); if (d.p.manual) el('mp').scrollIntoView({ behavior: 'smooth' }); return; }
-      r = await api(`/drafts/${d.id}/approve`, { form: JSON.parse(snap), priceOk: true });
+      r = await api(`/drafts/${d.id}/approve`, { form, priceOk: true });
     }
     savedForm = snap; // approving saved the form: nothing left for the leave-page flush
     toastNext(r.again ? '已保存修改' : '已批准 · ' + (r.slot || '等空位') + ' 发布');

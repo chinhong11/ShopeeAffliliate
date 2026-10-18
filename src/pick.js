@@ -129,8 +129,11 @@ export function swapNumbers(text, o, n) {
   const pairs = [[rm(o.price), rm(n.price)], [wasOf(o), wasOf(n)], [pctOf(o), pctOf(n)], ...['zh', 'ms', 'mix'].map(l => [fmtSold(o.sales, l), fmtSold(n.sales, l)])];
   const ro = rateOf(o), rn = rateOf(n);
   if (ro && rn) pairs.push(['★' + ro, '★' + rn], [ro + '★', rn + '★'], ['评分 ' + ro, '评分 ' + rn], [ro + ' 分', rn + ' 分'], ['rating ' + ro, 'rating ' + rn], ['Rating ' + ro, 'Rating ' + rn]);
-  for (const [a, b] of pairs) if (a && b && a !== b) text = text.split(a).join(b);
-  return text;
+  /* one pass: a number swapped in is never swapped again (RM 10 → RM 20 while the old 原价 was RM 20) */
+  const map = new Map(pairs.filter(([a, b]) => a && b && a !== b));
+  if (!map.size) return text;
+  const keys = [...map.keys()].sort((x, y) => y.length - x.length).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return text.replace(new RegExp(keys.join('|'), 'g'), m => map.get(m));
 }
 
 /* product data changed (pre-post price check): a headline built from the data is rebuilt from the new data
