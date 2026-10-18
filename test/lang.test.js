@@ -130,3 +130,14 @@ test('✨ AI 写文案 asks for Malay on a Malay draft, with the Malay link line
   assert.match(zh, /用简体中文写两段/);
   assert.match(zh, /👉 购买链接放在第一条评论 👇/);
 });
+
+test('0 sold says nothing (a new product added by hand); 限时抢购 has the same poster key in the browser and on the server', () => {
+  assert.equal(fmtSold(0), ''); assert.equal(fmtSold(0, 'ms'), '');
+  const d = draft('zh', { p: { sales: 0 } });
+  assert.equal(studioState(d, cfg).sold, '');
+  assert.ok(!/已售 0|0 terjual/.test(cap1(d, cfg) + cap1(draft('ms', { p: { sales: 0 } }), cfg)));
+  const t3 = o => draft('zh', { form: { tpl: 't3', flash: { end: '23:00', pct: '80', ...o } } });
+  assert.equal(posterKey(t3({ endAt: 0 }), cfg), posterKey(t3({ endAt: Date.now() + 5 * 3600e3 }), cfg), 'the browser sends endAt 0, the server dates it');
+  assert.notEqual(posterKey(t3({ end: '22:00' }), cfg), posterKey(t3({}), cfg), 'a new end time is a new poster');
+});
+

@@ -195,6 +195,20 @@ test('a post at its own 发布时间 sits outside postsPerDay: the day\'s slot s
   db.prepare('DELETE FROM slots').run();
 });
 
+test('a headline saved while the pre-post price check waits for Shopee is kept (only its numbers change)', async () => {
+  reset();
+  const id = mk({ price: 20 });
+  shop.items[drafts.get(id).itemId].node.priceMin = '19.80'; // a small move: the check updates the draft
+  shop.delayMs = 300;
+  const run = pub.priceCheck(drafts.get(id));
+  await new Promise(r => setTimeout(r, 100));
+  svc.saveForm(id, { l1: '我改的标题 RM 20.00' });
+  const r = await run;
+  assert.ok(r.ok && r.updated);
+  assert.equal(drafts.get(id).form.l1, '我改的标题 RM 19.80');
+  assert.equal(drafts.get(id).p.price, 19.8);
+});
+
 test('link mode switched to direct after approval: the post carries the link in the caption', async () => {
   reset();
   const auto = mk(), manual = mk({ form: { cap1: '我写的文案\n👉 购买链接放在第一条评论 👇', cap1Manual: true } });

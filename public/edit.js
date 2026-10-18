@@ -189,7 +189,10 @@ el('langs').onclick = e => {
   const b = e.target.closest('[data-lang]'); if (!b || b.dataset.lang === langOf(cfg, f)) return;
   const was = suggest(d.p, f.used, cfg, f).findIndex(([a, s]) => a === f.l1 && s === f.l2);
   f.lang = b.dataset.lang;
-  if (was >= 0 || !f.l1.trim()) { const list = suggest(d.p, f.used, cfg, f); [f.l1, f.l2] = list[Math.max(0, was) % list.length]; el('l1').value = f.l1; el('l2').value = f.l2; }
+  const list = suggest(d.p, f.used, cfg, f);
+  if (was >= 0) { [f.l1, f.l2] = list[was % list.length]; el('l2').value = f.l2; } // the app's own headline: switch both lines
+  else if (!f.l1.trim()) f.l1 = list[0][0]; // an empty headline gets one; a subtitle you wrote stays
+  el('l1').value = f.l1;
   renderLang(); renderHooks(); changed();
 };
 

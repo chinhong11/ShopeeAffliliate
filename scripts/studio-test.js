@@ -129,6 +129,11 @@ try {
   await p.click('#regen'); await p.waitForTimeout(300); await posterReady(); await p.waitForTimeout(500);
   check('中文 again: saved, the first poster back', form().lang === 'zh' && drafts.get(d.id).posterKey === key0, form().lang);
 
+  /* 8a: an empty headline and a subtitle you wrote: switching language fills the headline, keeps your subtitle */
+  await p.fill('#l1', ''); await p.fill('#l2', 'only my sub'); await p.click('[data-lang="ms"]');
+  const mine = { l1: await p.inputValue('#l1'), l2: await p.inputValue('#l2') };
+  check('language switch keeps a hand-written subtitle', mine.l2 === 'only my sub' && mine.l1.trim() && !HAN.test(mine.l1), mine);
+
   /* 8b: the same draft open in two tabs (phone + laptop): each tab's autosave keeps the other's saved edit */
   const q = await ctx.newPage(); q.on('pageerror', e => errors.push('tab B: ' + e.message));
   await q.goto(B + '/d/' + d.id); await q.waitForSelector('#l2');

@@ -36,6 +36,7 @@ const movedMoreThan3 = (a, b) => { const c0 = Math.round(a * 100), c1 = Math.rou
 export async function priceCheck(d, { dryRun = false } = {}) {
   if (d.p.manual) return { ok: true }; // added by hand: no API to re-check against
   const node = await shopee.product(d.shopId, d.itemId);
+  d = drafts.get(d.id) || d; // what was saved while Shopee answered (an edit to the headline) is what gets updated
   if (!node) return { ok: false, gone: true, message: '商品下架了或不在联盟计划里，这次没有发。' };
   const n = productFromOffer(node), o = d.p;
   if (!(n.price > 0)) return { ok: false, message: 'Shopee 这次没给出价格（或是 0），已退回待审核，价格没改。这个时段没有发帖。' }; // a glitch, not a new price: keep the old one

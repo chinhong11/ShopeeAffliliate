@@ -256,6 +256,7 @@ export async function syncShortLink(d) {
   if (d.p.manual || d.subIds[1] === d.form.tpl) return d; // a hand-added product keeps the link that was pasted
   const subIds = shopee.cleanSubIds(['fb', d.form.tpl, d.strat, d.subIds[3] || ymd(), d.id]);
   const link = await shopee.shortLink(d.p.productLink || d.p.offerLink, subIds);
+  d = drafts.get(d.id) || d; // edits saved while Shopee answered stay
   const f = d.form, old = d.shortLink;
   if (old) { f.cap1 = f.cap1.split(old).join(link); f.cap2 = f.cap2.split(old).join(link); }
   d.shortLink = link; d.subIds = subIds;

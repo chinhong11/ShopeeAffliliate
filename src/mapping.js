@@ -37,7 +37,7 @@ export function fmtSoldNum(n) {
   if (n < 10000) return Math.floor(n / 100) / 10 + 'k+';
   return Math.floor(n / 1000) + 'k+';
 }
-export const fmtSold = (n, lang = 'zh') => lang === 'mix' ? fmtSoldNum(n) + ' sold' : lang === 'ms' ? fmtSoldNum(n) + ' terjual' : '已售 ' + fmtSoldNum(n);
+export const fmtSold = (n, lang = 'zh') => !n ? '' : lang === 'mix' ? fmtSoldNum(n) + ' sold' : lang === 'ms' ? fmtSoldNum(n) + ' terjual' : '已售 ' + fmtSoldNum(n);
 
 /* strip 【…】, emoji, "Ready Stock" / "COD" noise; ≤ 24 characters */
 export function shortName(s) {
@@ -181,5 +181,7 @@ export function placeholderProblems(live, patch) {
 export function hash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + '_' + s.length; }
 export const posterKey = (d, cfg) => {
   const { cap, ...st } = studioState({ ...d, now: 0 }, cfg);
+  /* 限时抢购: the typed end time, not the countdown worked out from it (the browser and the server date it differently) */
+  if (st.tpl === 't3') st.cd = (d.form.flash && d.form.flash.end) || '';
   return hash(JSON.stringify(st.tpl === 't4' ? { ...st, link: cap.link } : st));
 };
