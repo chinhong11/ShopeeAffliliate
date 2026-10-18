@@ -1,6 +1,6 @@
 /* 编辑草稿 */
 import { api, toast, toastNext, flagSmall } from '/static/app.js';
-import { TPL, TPL_NOTE, TPL_LOCK, TPL_ORDER, LAYOUT, LANGS, langOf, posterKey } from '/shared/mapping.js';
+import { TPL, TPL_NOTE, TPL_LOCK, TPL_ORDER, LANGS, langOf, posterKey } from '/shared/mapping.js';
 import { suggest, availability, cap1, cap2, isPersonal } from '/shared/pick.js';
 
 const $ = (s, el = document) => el.querySelector(s);

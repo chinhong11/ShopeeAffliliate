@@ -139,7 +139,7 @@ If the app stops working after a change, the file most likely has a typo. Open `
 | `collectAt` | Time the app collects new products each day | `"08:00"` |
 | `postTimes` | Posting times. Each one moves by up to `jitterMinutes` so posts don't look automatic. They are kept at least 3 hours apart. | `["12:30", "20:30"]` |
 | `jitterMinutes` | How far a posting time may move, earlier or later | `10` |
-| `postsPerDay` | Most posts in one day | `2` |
+| `postsPerDay` | Most posts in one day at the posting times. A draft with its own 发布时间 doesn't count toward it. | `2` |
 | `categories` | What to collect. `name` is also used as the search word when `productCatId` is `null`. | `[{"name": "Home & Living", "productCatId": null}]` |
 | `strategies` | How many drafts per day from each list: `topSellers` 爆卖, `highestCommission` 高佣, `biggestDiscount` 大折扣. Set `"enabled": false` to turn one off. | `"topSellers": {"enabled": true, "perDay": 2}` |
 | `filters.minRating` | Lowest product rating to accept | `4.7` |

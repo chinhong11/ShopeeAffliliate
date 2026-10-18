@@ -140,7 +140,7 @@ const str = (v, n) => String(v ?? '').slice(0, n);
    own studio state (mapping.studioState). Only these fields, only valid values; prices, rating, sold, photos and
    the brand badge stay the app's. */
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-const STUDIO_FONTS = ['"Noto Sans SC","Nunito"', '"Baloo 2","Noto Sans SC"', '"Ma Shan Zheng","Noto Sans SC"', '"Montserrat","Noto Sans SC"', '"Anton","Noto Sans SC"'];
+const STUDIO_FONTS = Object.values(gemini.FONTS); // the fonts the studio and ✨ AI 设计 offer: one list
 const num = (v, lo, hi) => v === '' || v == null || typeof v === 'boolean' || !Number.isFinite(+v) ? undefined : Math.min(hi, Math.max(lo, +v));
 const int = (v, lo, hi) => { const n = num(v, lo, hi); return n === undefined ? n : Math.round(n); };
 function cleanLook(lk, photos = []) {

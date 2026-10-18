@@ -181,6 +181,20 @@ test('Shopee gives no price (0) right before posting: not posted, back to review
   assert.equal(drafts.get(id).p.price, 20, 'the old price is kept');
 });
 
+test('a post at its own 发布时间 sits outside postsPerDay: the day\'s slot still posts', async () => {
+  reset();
+  drafts.list('approved').forEach(d => drafts.update(d.id, { status: 'skipped' }));
+  writeCfg({ postsPerDay: 1 });
+  const own = mk({ form: { postAt: Date.now() - 30e3 } }), queued = mk(), s = slot('12:30');
+  await pub.publishDue();
+  assert.equal(drafts.get(own).status, 'posted');
+  assert.equal(drafts.get(queued).status, 'posted', 'the slot was not skipped as "postsPerDay reached"');
+  assert.equal(db.prepare('SELECT status FROM slots WHERE id=?').get(s).status, 'used');
+  assert.equal(pub.postedToday(), 1, 'only the slot post counts');
+  writeCfg({});
+  db.prepare('DELETE FROM slots').run();
+});
+
 test('link mode switched to direct after approval: the post carries the link in the caption', async () => {
   reset();
   const auto = mk(), manual = mk({ form: { cap1: '我写的文案\n👉 购买链接放在第一条评论 👇', cap1Manual: true } });

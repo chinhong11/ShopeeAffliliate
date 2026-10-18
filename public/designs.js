@@ -28,7 +28,8 @@ async function fresh() {
   if (busy) return;
   busy = true; $('again').disabled = true; $('again').textContent = '设计中…';
   $('grid').innerHTML = '<div class="empty"><i class="spin"></i><b>Gemini 正在设计 4 款…</b><p>大概 10–20 秒，之后每款海报会一张张画出来。</p></div>';
-  try { list = (await api(`/drafts/${id}/designs`, {})).designs; draw(); previews(++run); }
+  const r = ++run; // stops the old round now, not when Gemini answers (it kept drawing the old designs over this screen)
+  try { list = (await api(`/drafts/${id}/designs`, {})).designs; draw(); previews(r); }
   catch (e) { $('grid').innerHTML = `<div class="empty"><b>没设计出来</b><p>${esc(e.message)}</p></div>`; }
   busy = false; $('again').disabled = false; $('again').textContent = '↻ 再出 4 款';
 }

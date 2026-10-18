@@ -1,14 +1,12 @@
 /* Shopee offer → product → studio state (README Step 1 mapping).
    Plain ESM with no Node imports: also served to the review app at /shared/mapping.js. */
 
-export const STRATS = { top: { zh: '爆卖', key: 'topSellers' }, com: { zh: '高佣', key: 'highestCommission' }, disc: { zh: '大折扣', key: 'biggestDiscount' }, man: { zh: '手动', key: 'manual' } };
+export const STRATS = { top: { zh: '爆卖' }, com: { zh: '高佣' }, disc: { zh: '大折扣' }, man: { zh: '手动' } };
 export const STRAT_CODE = { topSellers: 'top', highestCommission: 'com', biggestDiscount: 'disc' };
 export const TPL = { t1: '爆款分享', t2: '价格暴击', t3: '限时抢购', t4: '好友爆料', t5: '真实好评', t6: '杂志封面', t8: '轮播套图' };
 export const TPL_NOTE = { t1: '照片为主', t2: '大字价格', t6: '杂志风', t5: '买家原话', t3: '倒计时', t4: '聊天截图风', t8: '4 张一组' };
 export const TPL_LOCK = { t5: '先填买家真实评价', t3: '需要真实结束时间', t4: '需要你写聊天内容', t8: '需要 4 张照片' };
 export const TPL_ORDER = ['t1', 't2', 't6', 't5', 't3', 't4', 't8'];
-export const LAYOUT = ['', '单图', '双图', '三图', '四宫格'];
-export const GRID_TPLS = ['t1', 't2', 't3', 't5', 't6'];
 /* photo on top, words in a panel underneath (studio-canvas-v3.css): there is always room for the price */
 export const PANEL = ['t1', 't2', 't6'];
 

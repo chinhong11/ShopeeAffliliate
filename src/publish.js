@@ -23,7 +23,8 @@ const base = d => ({ draft_id: d.id, item_id: d.itemId, name: d.p.name, tpl: d.f
 const setSlot = (slotId, status, draftId = null) => slotId && db.prepare('UPDATE slots SET status=?, draft_id=COALESCE(?, draft_id) WHERE id=?').run(status, draftId, slotId);
 /* atomic: only one publisher (scheduler, CLI) gets a slot */
 const claimSlot = slotId => db.prepare("UPDATE slots SET status='posting' WHERE id=? AND status='open'").run(slotId).changes > 0;
-export const postedToday = () => db.prepare("SELECT COUNT(*) n FROM posts WHERE kind='posted' AND at>=?").get(new Date(dayStr() + 'T00:00:00').getTime()).n;
+/* posts today that count toward postsPerDay: not those at a draft's own 发布时间 (they sit outside the slots, RUNNING.md) */
+export const postedToday = () => db.prepare("SELECT COUNT(*) n FROM posts p LEFT JOIN drafts d ON d.id=p.draft_id WHERE p.kind='posted' AND p.at>=? AND json_extract(d.form, '$.postAt') IS NULL").get(new Date(dayStr() + 'T00:00:00').getTime()).n;
 /* marks a posted row whose first comment was still on its way; recoverInterrupted() rewrites it after a crash */
 const COMMENT_PENDING = '正在发第一条评论…';
 
