@@ -126,3 +126,27 @@ test('a Facebook error leaves it a draft with the reason; a token error pauses; 
   assert.equal((await post(`/content/${item.id}/delete`, {})).status, 200);
   assert.equal(svc.getContent(item.id), undefined);
 });
+
+test('a post cut off mid-way (restart) shows as stuck; the person says whether it went up', async () => {
+  const { db } = await import('../src/db.js');
+  const mk = async () => (await post('/content', { kind: 'tip', data: { title: 'Cut', points: ['a'] } })).item.id;
+  const a = await mk(), b = await mk();
+  assert.match((await post(`/content/${a}/resolve`, { posted: true })).error, /不是/); // a normal draft can't be marked
+  db.prepare("UPDATE content SET status='posting' WHERE id IN (?,?)").run(a, b);
+  assert.ok(svc.getContent(a).stuck);
+  assert.ok((await (await get('/tips')).text()).includes('发到一半中断了'));
+  assert.equal((await post(`/content/${a}/resolve`, { posted: true })).item.status, 'posted');
+  const back = (await post(`/content/${b}/resolve`, { posted: false })).item;
+  assert.deepEqual([back.status, !!back.error], ['draft', true]);
+});
+
+test('ideas are told what was already written; hashtags go at the end of the post', () => {
+  const p = gemini.ideasPrompt('meme', 'zh', Date.now(), ['Gaji masuk / Gaji keluar']);
+  assert.ok(p.includes('不要重复') && p.includes('- Gaji masuk / Gaji keluar'));
+  assert.ok(!gemini.ideasPrompt('meme', 'zh').includes('不要重复'));
+  const d = { caption: 'Cuba ni', lang: 'ms' };
+  assert.equal(svc.contentMessage(d, { hashtags: { ms: '#shopee' } }), 'Cuba ni\n\n#shopee');
+  assert.equal(svc.contentMessage(d, { hashtags: '#shopee', contentHashtags: { ms: '#tipsharian', zh: '#贴士' } }), 'Cuba ni\n\n#tipsharian');
+  assert.equal(svc.contentMessage(d, { hashtags: '#shopee', contentHashtags: '' }), 'Cuba ni');
+  assert.equal(svc.contentMessage({ caption: 'x #tipsharian', lang: 'ms' }, { contentHashtags: '#tipsharian' }), 'x #tipsharian');
+});

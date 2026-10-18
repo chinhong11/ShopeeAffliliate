@@ -190,3 +190,7 @@ button.ct-row{cursor:pointer}
 .ct-row a{color:var(--shopee-2)}
 .ct-err{background:rgba(238,77,45,.14);border:1px solid var(--shopee);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;margin-bottom:10px}
 .bp-out .btn{white-space:nowrap}
+.ct-stuck{border-color:var(--shopee)}
+.ct-stuck .when{margin-top:6px}
+[hidden]{display:none!important} /* a display rule (e.g. .bp-out{display:flex}) must not undo the hidden attribute */
+.bp-form .hint+.field{margin-top:14px}

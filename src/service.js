@@ -6,7 +6,7 @@ import { loadConfig, dirs } from './config.js';
 import { drafts, kv, ymd, db, dayStr, newDraftId } from './db.js';
 import { newForm, withCaptions } from './draft.js';
 import * as shopee from './shopee.js';
-import { posterKey, studioState, TPL, endAtFrom, WORDS, langOf, rm } from './mapping.js';
+import { posterKey, studioState, TPL, endAtFrom, WORDS, langOf, rm, tagsOf } from './mapping.js';
 import { refreshCaptions, refreshHeadline, swapNumbers, availability, isPersonal, suggest } from './pick.js';
 import { renderDraft, renderState, photoDataUrl, posterFile, thumbFile, renderHtml } from './render.js';
 import * as fb from './facebook.js';
@@ -466,7 +466,9 @@ export const logRows = (days = 30) => db.prepare("SELECT * FROM posts WHERE at>=
 
 /* ---------- 贴士 / 梗图: written (or picked from Gemini's ideas) on their own tabs, posted only when the person taps 发布 ---------- */
 const kindOf = k => { if (!KINDS[k]) throw new Error('不认识的类型'); return k; };
-const crow = r => r && { id: r.id, kind: r.kind, status: r.status, data: JSON.parse(r.data), postId: r.fb_post_id, permalink: r.permalink, error: r.error, createdAt: r.created_at, postedAt: r.posted_at };
+const crow = r => r && { id: r.id, kind: r.kind, status: r.status, stuck: r.status === 'posting' && !contentPosting.has(r.id), data: JSON.parse(r.data), postId: r.fb_post_id, permalink: r.permalink, error: r.error, createdAt: r.created_at, postedAt: r.posted_at };
+/* ids being posted by this process: a 'posting' row not in here was cut off (crash or restart) and needs the person to say what happened */
+const contentPosting = new Set();
 export const getContent = id => crow(db.prepare('SELECT * FROM content WHERE id=?').get(Number(id)));
 export const listContent = kind => db.prepare("SELECT * FROM content WHERE kind=? ORDER BY status='posted', COALESCE(posted_at, updated_at) DESC LIMIT 60").all(kindOf(kind)).map(crow);
 const cleanFor = (kind, o) => cleanContent(kind, o, loadConfig().brand);
@@ -494,7 +496,10 @@ export function contentPng(id) {
   return renderHtml(contentHtml(c.kind, c.data, c.data.photo ? photoDataUrl(c.data.photo) : ''), CONTENT_SIZE);
 }
 export async function contentIdeas(kind, lang) {
-  return (await gemini.contentIdeas(kindOf(kind), lang === 'ms' ? 'ms' : 'zh')).map(o => cleanFor(kind, { ...o, lang }));
+  /* the last 30 written, so Gemini doesn't suggest the same thing again */
+  const recent = db.prepare('SELECT data FROM content WHERE kind=? ORDER BY id DESC LIMIT 30').all(kindOf(kind))
+    .map(r => { const d = JSON.parse(r.data); return kind === 'tip' ? d.title : [d.top, d.bottom].filter(Boolean).join(' / '); }).filter(Boolean);
+  return (await gemini.contentIdeas(kind, lang === 'ms' ? 'ms' : 'zh', fetch, recent)).map(o => cleanFor(kind, { ...o, lang }));
 }
 /* 发布: right away, not in the daily slots and not counted in postsPerDay */
 export async function postContent(id) {
@@ -505,9 +510,11 @@ export async function postContent(id) {
   const png = await contentPng(id);
   /* claim it: a second tap (or another tab) can't post it twice */
   if (!db.prepare("UPDATE content SET status='posting', error=NULL WHERE id=? AND status='draft'").run(c.id).changes) throw new Error('这一帖已经在发或发过了，刷新看看');
+  contentPosting.add(c.id);
   let post;
-  try { post = await fb.postPhoto(png, c.data.caption); }
+  try { post = await fb.postPhoto(png, contentMessage(c.data)); }
   catch (e) {
+    contentPosting.delete(c.id);
     const fatal = e instanceof fb.FbError && e.fatal;
     if (fatal) pause.set(e.code, pauseText(e.code), undefined, fbWords(e.message));
     const msg = e instanceof fb.FbError && e.status === 599 ? `连接 Facebook 时网络中断（${e.message}）。帖子可能已经发出去了：先到专页看看，没有再发一次。` : e.message;
@@ -516,6 +523,20 @@ export async function postContent(id) {
   }
   const postId = post.post_id || post.id;
   db.prepare("UPDATE content SET status='posted', fb_post_id=?, posted_at=? WHERE id=?").run(postId, Date.now(), c.id); // recorded first: never a second post
+  contentPosting.delete(c.id);
   db.prepare('UPDATE content SET permalink=? WHERE id=?').run(await fb.permalink(postId), c.id);
+  return getContent(id);
+}
+/* the caption + contentHashtags (or hashtags) for the post's language, unless the caption already ends with them */
+export function contentMessage(d, cfg = loadConfig()) {
+  const tags = tagsOf({ hashtags: cfg.contentHashtags ?? cfg.hashtags }, d.lang).trim();
+  return tags && !d.caption.endsWith(tags) ? (d.caption ? d.caption + '\n\n' : '') + tags : d.caption;
+}
+/* a post cut off mid-way: the person checked the Page and says whether it went up */
+export function resolveContent(id, posted) {
+  const c = getContent(id);
+  if (!c || !c.stuck) throw new Error('这一帖不是「不确定有没有发」的状态，刷新看看');
+  db.prepare(`UPDATE content SET status=?, posted_at=?, error=?, updated_at=? WHERE id=? AND status='posting'`)
+    .run(posted ? 'posted' : 'draft', posted ? Date.now() : null, posted ? null : '上次发到一半中断了（你确认了没有发出去）', Date.now(), c.id);
   return getContent(id);
 }

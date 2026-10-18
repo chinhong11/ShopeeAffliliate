@@ -8,7 +8,7 @@ import { db, drafts, kv } from './db.js';
 import { isAuthed, sessionCookie, clearCookie, tryLogin } from './auth.js';
 import * as svc from './service.js';
 import { todayView } from './slots.js';
-import { posterKey, studioState, STRATS, TPL, langOf } from './mapping.js';
+import { posterKey, studioState, STRATS, TPL, langOf, tagsOf } from './mapping.js';
 import { SIZE, cleanBrand, coverHtml, avatarHtml } from './brand.js';
 import { thumbFile, viewFile, posterFile, pageFile, closeBrowser, renderHtml } from './render.js';
 import * as fb from './facebook.js';
@@ -148,7 +148,8 @@ app.get('/brand/:kind.png', async (req, res, next) => {
 /* 贴士 / 梗图: posts that aren't products (src/content.js), posted only when 发布 is tapped */
 for (const [path_, kind] of [['/tips', 'tip'], ['/memes', 'meme']]) app.get(path_, (req, res) => {
   const cfg = loadConfig();
-  res.send(contentView({ brand: brand(), count: pendingCount(), kind, list: svc.listContent(kind), lang: langOf(cfg), b: cfg.brand, ai: gemini.enabled(), paused: !!svc.pause.get() }));
+  const tags = l => tagsOf({ hashtags: cfg.contentHashtags ?? cfg.hashtags }, l).trim();
+  res.send(contentView({ brand: brand(), count: pendingCount(), kind, list: svc.listContent(kind), lang: langOf(cfg), b: cfg.brand, ai: gemini.enabled(), paused: !!svc.pause.get(), tags: { zh: tags('zh'), ms: tags('ms') } }));
 });
 app.get('/content/:id.png', async (req, res, next) => {
   if (!svc.getContent(req.params.id)) return next();
@@ -285,6 +286,7 @@ api.post('/content/photo', wrap(req => ({ photo: svc.saveContentPhoto(req.body &
 api.post('/content', wrap(req => ({ item: svc.newContent(req.body && req.body.kind, req.body && req.body.data) })));
 api.post('/content/:id', wrap(req => ({ item: svc.saveContent(req.params.id, req.body && req.body.data) })));
 api.post('/content/:id/post', wrap(async req => ({ item: await svc.postContent(req.params.id) })));
+api.post('/content/:id/resolve', wrap(req => ({ item: svc.resolveContent(req.params.id, !!(req.body && req.body.posted)) })));
 api.post('/content/:id/delete', wrap(req => svc.deleteContent(req.params.id)));
 api.post('/posts/:id/retry', wrap(req => publish.retryPost(Number(req.params.id))));
 api.post('/posts/:id/delete', wrap(req => publish.deletePosted(Number(req.params.id))));

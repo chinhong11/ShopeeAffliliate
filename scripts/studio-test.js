@@ -163,7 +163,8 @@ try {
   check('主页图: choices kept for next time', kept.name === 'CH Hub' && kept.cover === 'dark' && kept.lang === 'ms', kept);
   await p.reload(); check('主页图: page opens with them', (await p.inputValue('#name')) === 'CH Hub');
   /* 10: 梗图: write one, the preview follows, 生成海报 → 1080×1080, then 发布 shows; any change hides it again */
-  await p.goto(B + '/memes'); await p.click('#blank'); await p.click('[data-lang="ms"]');
+  await p.goto(B + '/memes'); await p.click('#blank');
+  check('梗图: no 发布 button before a poster is made', await p.$eval('#post', b => !b.offsetParent)); await p.click('[data-lang="ms"]');
   await p.fill('#top', 'Gaji masuk'); await p.fill('#bottom', 'Gaji keluar <b>');
   const mv = await p.$eval('#pv iframe', f => f.srcdoc);
   check('梗图: preview follows the typing, words as text', mv.includes('Gaji masuk') && mv.includes('Gaji keluar &lt;b&gt;') && mv.includes('class="meme"'));
@@ -172,7 +173,7 @@ try {
   const mp = await p.evaluate(() => ({ w: outImg.naturalWidth, h: outImg.naturalHeight, post: !document.getElementById('post').hidden, del: !document.getElementById('del').hidden }));
   check('梗图: 生成海报 1080×1080, 发布 and 删除 there', mp.w === 1080 && mp.h === 1080 && mp.post && mp.del, mp);
   await p.fill('#top', 'Gaji masuk!');
-  check('梗图: a change hides the poster until 生成 again', await p.$eval('#out', o => o.hidden));
+  check('梗图: a change hides the poster until 生成 again', await p.$eval('#out', o => o.hidden && getComputedStyle(o).display === 'none' && !o.querySelector('#post').offsetParent));
   await p.reload();
   check('梗图: saved as a draft', (await p.$$eval('[data-open]', l => l.map(x => x.textContent))).some(t => t.includes('Gaji masuk / Gaji keluar <b>')));
   /* 11: 梗图 with a photo: pick 照片, upload, the preview and the PNG use it */

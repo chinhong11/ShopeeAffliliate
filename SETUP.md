@@ -154,6 +154,7 @@ If the app stops working after a change, the file most likely has a typo. Open `
 | `noRepeatDays` | Don't post the same product again within this many days | `30` |
 | `voucherCode` | A voucher code to mention in posts. `""` means none. | `"LEE10"` |
 | `hashtags` | Hashtags at the end of each post: one for Chinese posts (`zh`) and one for Malay posts (`ms`). A single `"…"` is used for both. | `{"zh": "#shopee #好物分享", "ms": "#shopee #barangviral"}` |
+| `contentHashtags` | The same, for 贴士 / 梗图 posts. Leave it out to use `hashtags`; `""` for none. | `{"zh": "#生活小贴士", "ms": "#tipsharian"}` |
 | `linkMode` | `"comment"`: the link goes in the first comment. `"direct"`: the link goes in the post itself. | `"comment"` |
 | `language` | The language new posts start in: `"zh"` Chinese, `"ms"` Bahasa Melayu (`"mix"`, Chinese mixed with English, still works). You can switch any draft on its edit page under 海报和文案的语言. The review app itself stays in Chinese. | `"ms"` |
 | `brand` | The round badge on posters: `bName`, `bTag`, `bInit`, `bstyle` (`"lee"` or `"pill"`), `badgec` (colour) | `{"bName": "LEE", "bTag": "Sharing"}` |

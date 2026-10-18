@@ -9,6 +9,7 @@
   "brand": { "bstyle": "lee", "bInit": "L", "bName": "LIM", "bTag": "Sharing", "badgec": "#1c1c1e" },
   "voucherCode": "",
   "hashtags": { "zh": "#shopee #好物分享 #开箱", "ms": "#shopee #shopeemalaysia #barangviral" },
+  "contentHashtags": { "zh": "#生活小贴士 #马来西亚", "ms": "#tipsharian #malaysia" },
   "noRepeatDays": 30,
   "categories": [],
   "strategies": {

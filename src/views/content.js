@@ -10,7 +10,7 @@ const INTRO = {
   meme: '两行字的梗图：配 emoji，或配一张照片。好笑、大家都懂的日常。'
 };
 
-export function contentView({ brand, count, kind, list, lang, b, ai, paused }) {
+export function contentView({ brand, count, kind, list, lang, b, ai, paused, tags }) {
   const name = KINDS[kind], tip = kind === 'tip';
   const field = (id, label, max, soft = '') => `<div class="field"><label for="${id}">${label}${soft ? ` <span class="soft">${soft}</span>` : ''}</label><input id="${id}" type="text" maxlength="${max}"></div>`;
   const area = (id, label, rows, max, soft = '') => `<div class="field"><label for="${id}">${label}${soft ? ` <span class="soft">${soft}</span>` : ''}</label><textarea id="${id}" rows="${rows}" maxlength="${max}"></textarea></div>`;
@@ -42,6 +42,7 @@ export function contentView({ brand, count, kind, list, lang, b, ai, paused }) {
           <div class="field" id="photoField" hidden><label>照片 <span class="soft">自己的照片，或有权使用的图片</span></label><div class="when"><button type="button" class="btn btn-ghost" id="pickPhoto">📷 选照片</button></div><input id="photoIn" type="file" accept="image/*" hidden></div>`
       + field('top', '第一行', 60, '情况') + field('e1', '第一行 emoji', 3) + field('bottom', '第二行', 60, '反应 / 结果') + field('e2', '第二行 emoji', 3)}
           ${area('caption', '帖子文字', 4, 1500, '发在图片上面')}
+          ${tags.zh || tags.ms ? `<div class="hint">发布时会在最后加上 hashtag：<span id="tags"></span>（在 config.json 的 contentHashtags 改）</div>` : ''}
           <div class="field"><label for="accent">主色</label><div class="bp-color"><input id="accent" type="color"><span class="soft" id="accentHex"></span></div></div>
           <div class="ct-err" id="err" role="alert" hidden></div>
           <div class="when"><button type="button" class="btn btn-primary" id="make">生成海报</button><button type="button" class="btn btn-ghost" id="del" hidden>删除</button></div>
@@ -52,7 +53,9 @@ export function contentView({ brand, count, kind, list, lang, b, ai, paused }) {
         </section>
         <section class="sec">
           <div class="sec-h"><span class="ic">🗂️</span><h2>草稿</h2></div>
-          ${drafts.length ? `<ul class="ct-list">${drafts.map(c => `<li><button type="button" class="ct-row" data-open="${c.id}"><b>${line(c)}</b><span>${esc(LANGS[c.data.lang])}${c.error ? ' · 上次没发成' : ''}</span></button></li>`).join('')}</ul>` : '<div class="hint">还没有草稿。</div>'}
+          ${drafts.length ? `<ul class="ct-list">${drafts.map(c => c.stuck ? `<li><div class="ct-row ct-stuck"><b>${line(c)}</b><span>发到一半中断了（App 重启或断线），可能已经发出去了。先到专页看看：</span><div class="when"><button type="button" class="btn btn-ghost btn-sm" data-resolve="${c.id}" data-posted="1">已经发了</button><button type="button" class="btn btn-ghost btn-sm" data-resolve="${c.id}" data-posted="">没发，退回草稿</button></div></div></li>`
+    : c.status === 'posting' ? `<li><div class="ct-row"><b>${line(c)}</b><span>发布中…</span></div></li>`
+    : `<li><button type="button" class="ct-row" data-open="${c.id}"><b>${line(c)}</b><span>${esc(LANGS[c.data.lang])}${c.error ? ' · 上次没发成' : ''}</span></button></li>`).join('')}</ul>` : '<div class="hint">还没有草稿。</div>'}
         </section>
         <section class="sec">
           <div class="sec-h"><span class="ic">✅</span><h2>已发布</h2></div>
@@ -60,5 +63,5 @@ export function contentView({ brand, count, kind, list, lang, b, ai, paused }) {
         </section>
       </div>
     </div><div class="endpad"></div></div>`;
-  return page({ title: name, brand, body, tab: kind, count, data: { kind, lang, b, items: drafts }, script: '/static/content.js' });
+  return page({ title: name, brand, body, tab: kind, count, data: { kind, lang, b, tags, items: drafts.filter(c => c.status === 'draft') }, script: '/static/content.js' });
 }

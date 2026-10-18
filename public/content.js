@@ -3,7 +3,7 @@ import { api, toast } from '/static/app.js';
 import { SIZE, cleanContent, contentHtml, missing } from '/shared/content.js';
 
 const el = id => document.getElementById(id);
-const { kind, lang: defLang, b: brand, items } = JSON.parse(el('data').textContent);
+const { kind, lang: defLang, b: brand, tags, items } = JSON.parse(el('data').textContent);
 const TEXTS = kind === 'meme' ? ['top', 'e1', 'bottom', 'e2', 'caption'] : ['title', 'points', 'caption'];
 let o = { lang: defLang }, id = null, made = false;
 
@@ -14,6 +14,7 @@ function render() {
   const k = box.clientWidth / SIZE.w;
   fr.style.transform = `scale(${k})`; box.style.height = SIZE.h * k + 'px';
   document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === c.lang)));
+  if (el('tags')) el('tags').textContent = tags[c.lang] || '（这个语言没有）';
   if (kind === 'meme') {
     const photo = c.style === 'photo';
     document.querySelectorAll('[data-style]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.style === c.style)));
@@ -67,6 +68,10 @@ document.addEventListener('click', e => {
   if (l) { o.lang = l.dataset.lang; stale(); render(); }
   const st = e.target.closest('[data-style]');
   if (st) { o.style = st.dataset.style; stale(); render(); }
+  const rs = e.target.closest('[data-resolve]');
+  if (rs && confirm(rs.dataset.posted ? '确定已经在专页上看到这一帖了？' : '确定专页上没有这一帖？退回草稿后可以再发。')) {
+    api(`/content/${rs.dataset.resolve}/resolve`, { posted: !!rs.dataset.posted }).then(() => location.reload(), err => toast(err.message));
+  }
   const op = e.target.closest('[data-open]');
   if (op) { const c = items.find(x => String(x.id) === op.dataset.open); if (c) load(c.data, c.id, c.error); }
 });

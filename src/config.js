@@ -61,7 +61,7 @@ export const CONFIG_FILE = e.CONFIG_FILE ? path.resolve(ROOT, e.CONFIG_FILE) : p
 
 const DEFAULTS = {
   timezone: 'Asia/Kuala_Lumpur', collectAt: '08:00', postTimes: ['12:30', '20:30'], jitterMinutes: 10, postsPerDay: 2,
-  language: 'zh', linkMode: 'comment', brand: {}, voucherCode: '', hashtags: '', noRepeatDays: 30, categories: [],
+  language: 'zh', linkMode: 'comment', brand: {}, voucherCode: '', hashtags: '', contentHashtags: null, noRepeatDays: 30, categories: [],
   strategies: { topSellers: { enabled: true, perDay: 2 }, highestCommission: { enabled: true, perDay: 2 }, biggestDiscount: { enabled: true, perDay: 2 } },
   filters: { minRating: 4.7, minSales: 500, excludeKeywords: [] }
 };
