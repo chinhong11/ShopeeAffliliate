@@ -33,12 +33,14 @@ const shopeeSrv = http.createServer((req, res) => {
   });
 });
 /* ---- fake Graph API ---- */
-const fbs = { calls: [], dropPhoto: false, holdComment: null };
+const fbs = { calls: [], dropPhoto: false, photoMode: '', holdComment: null };
 const graphSrv = http.createServer((req, res) => {
   let b = ''; req.on('data', c => b += c.toString('latin1')); req.on('end', async () => {
     const url = req.url.split('?')[0];
     fbs.calls.push({ method: req.method, url, body: Buffer.from(b, 'latin1').toString('utf8').replace(/\r\n/g, '\n') });
     const send = j => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(j)); };
+    if (url.endsWith('/photos') && fbs.photoMode === 'empty') { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(''); } // "OK", no answer
+    if (url.endsWith('/photos') && fbs.photoMode === 'cut') { res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Length': '99' }); res.write('{"id":'); return setTimeout(() => req.socket.destroy(), 20); }
     if (url.endsWith('/photos')) { if (fbs.dropPhoto) return req.socket.destroy(); return send({ id: 'ph', post_id: 'page_post' + fbs.calls.length }); }
     if (url.endsWith('/comments')) { if (fbs.holdComment) await fbs.holdComment; return send({ id: 'c1' }); }
     if (req.method === 'GET' && url.includes('page_post')) return send({ permalink_url: 'https://www.facebook.com/' + url.split('/').pop() });
@@ -84,7 +86,7 @@ function mk({ price = 20, disc = 30, tpl = 't1', status = 'approved', form = {},
 }
 const fresh = (id, d = drafts.get(id)) => { fs.writeFileSync(posterFile(id), PNG); fs.writeFileSync(thumbFile(id), PNG); drafts.update(id, { posterKey: posterKey(d, loadConfig()) }); };
 const photos = () => fbs.calls.filter(c => c.url.endsWith('/photos'));
-const reset = () => { fbs.calls.length = 0; shop.delayMs = 0; fbs.dropPhoto = false; svc.pause.clear(); db.prepare("DELETE FROM posts").run(); };
+const reset = () => { fbs.calls.length = 0; shop.delayMs = 0; fbs.dropPhoto = false; fbs.photoMode = ''; svc.pause.clear(); db.prepare("DELETE FROM posts").run(); };
 const slot = label => db.prepare('INSERT INTO slots(day,label,planned_at) VALUES(?,?,?)').run(dayStr(), label, Date.now() - 60e3).lastInsertRowid;
 
 test('撤回 while the pre-post price check runs: nothing is posted', async () => {
@@ -137,6 +139,46 @@ test('connection lost on the photo POST: not re-sent (no duplicate), recorded as
   fb.opts.fetchImpl = (() => { let n = 0; return async (...a) => { if (n++ === 0) throw new TypeError('fetch failed'); return fetch(...a); }; })();
   assert.ok(await fb.graph('GET', '/page_post1', {}));
   fb.opts.fetchImpl = (...a) => fetch(...a);
+});
+
+test('Facebook says OK with no answer, or the answer is cut off: maybe-posted, never posted again by the slot or another draft', async () => {
+  for (const mode of ['empty', 'cut']) {
+    reset();
+    drafts.list('approved').forEach(d => drafts.update(d.id, { status: 'skipped' }));
+    const a = mk(), b = mk(), s = slot('12:30');
+    fbs.photoMode = mode;
+    await pub.publishDue();
+    assert.equal(photos().length, 1, mode);
+    assert.equal(drafts.get(a).status, 'failed', mode);
+    assert.match(db.prepare("SELECT message FROM posts WHERE draft_id=?").get(a).message, /可能已经发出去了：先到专页看看/, mode);
+    assert.notEqual(db.prepare('SELECT status FROM slots WHERE id=?').get(s).status, 'open', mode);
+    fbs.photoMode = '';
+    await pub.publishDue(); // the next minute's check
+    assert.equal(photos().length, 1, mode + ': nothing more posted in that slot');
+    assert.equal(drafts.get(b).status, 'approved', mode);
+    db.prepare('DELETE FROM slots').run();
+  }
+});
+
+test('撤回 / 跳过 that come too late say so instead of "done"', async () => {
+  reset();
+  const id = mk();
+  drafts.update(id, { status: 'posting' });
+  assert.throws(() => svc.unapprove(id), /撤回不了/);
+  assert.throws(() => svc.skip(id), /已经处理过了/);
+  assert.equal(drafts.get(id).status, 'posting');
+  drafts.update(id, { status: 'skipped' });
+});
+
+test('Shopee gives no price (0) right before posting: not posted, back to review with the old price', async () => {
+  reset();
+  const id = mk({ price: 20 });
+  shop.items[drafts.get(id).itemId].node.priceMin = '0';
+  const r = await pub.publishDraft(id, {});
+  assert.notEqual(r.kind, 'posted');
+  assert.equal(photos().length, 0);
+  assert.equal(drafts.get(id).status, 'draft');
+  assert.equal(drafts.get(id).p.price, 20, 'the old price is kept');
 });
 
 test('link mode switched to direct after approval: the post carries the link in the caption', async () => {

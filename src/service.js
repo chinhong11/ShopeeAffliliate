@@ -280,7 +280,7 @@ export async function approve(id, form) {
   if (!ok) throw new Error('这张草稿刚刚变了（跳过、退回或正在发布），刷新后再看');
   return { again, slot: slotOf(id) };
 }
-export function skip(id) { drafts.update(id, { status: 'skipped' }, { from: ['draft'] }); }
+export function skip(id) { if (!drafts.update(id, { status: 'skipped' }, { from: ['draft'] })) throw new Error('这张草稿已经处理过了（批准、跳过或过期），刷新后再看'); }
 export function unskip(id) {
   const d = drafts.get(id);
   if (!d || d.status !== 'skipped') throw new Error('这张草稿已经不在「已跳过」里了');
@@ -293,7 +293,9 @@ export function unskip(id) {
 export function removeSkipped(id) {
   if (!db.prepare("DELETE FROM drafts WHERE id=? AND status='skipped'").run(String(id)).changes) throw new Error('这张草稿已经不在「已跳过」里了');
 }
-export function unapprove(id) { drafts.update(id, { status: 'draft', approvedAt: 0, pendingSince: Date.now() }, { from: ['approved'] }); }
+export function unapprove(id) {
+  if (!drafts.update(id, { status: 'draft', approvedAt: 0, pendingSince: Date.now() }, { from: ['approved'] })) throw new Error('这张草稿已经在发布或已经发出去了，撤回不了');
+}
 
 /* approved drafts fill upcoming slots in approval order; one with its own 发布时间 goes out then instead (k: -1, no slot) */
 export function approvedWithSlots(cfg = loadConfig(), now = Date.now()) {

@@ -36,10 +36,13 @@ export async function graph(method, path, params = {}, { file } = {}) {
         body.append(file.field, new Blob([file.buf], { type }), file.name.replace(/\.\w+$/, type === 'image/jpeg' ? '.jpg' : type === 'image/webp' ? '.webp' : '.png'));
       }
     }
-    try { res = await opts.fetchImpl(url, { method, body }); }
+    /* reading the answer is part of the network step: a line cut after Facebook's headers means it may have posted */
+    let text;
+    try { res = await opts.fetchImpl(url, { method, body }); text = await res.text(); }
     catch (e) { throw new FbError('network: ' + e.message, { status: 599 }); }
-    const text = await res.text();
     let j; try { j = JSON.parse(text); } catch { j = null; }
+    /* "OK" without a JSON answer (a proxy page, an empty body): the request may have been carried out, nothing to read */
+    if (res.ok && !j) throw new FbError(`network: Facebook HTTP ${res.status} without an answer`, { status: 599 });
     if (!res.ok || (j && j.error)) {
       const e = (j && j.error) || {};
       throw new FbError(`Facebook ${e.code ? '错误 ' + e.code : 'HTTP ' + res.status}: ${e.error_user_msg || e.message || text.slice(0, 200)}`,

@@ -152,7 +152,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
   if (!b || !ACT[b.dataset.act]) return;
   e.preventDefault(); e.stopPropagation();
-  ACT[b.dataset.act](b.dataset.id, b).catch(err => toast(err.message));
+  ACT[b.dataset.act](b.dataset.id, b).catch(err => { toast(err.message); refresh(); }); // the card may be stale: show it as it is now
 });
 /* 数据 → Gemini limits: a changed box saves that model's three numbers */
 document.addEventListener('change', async e => {

@@ -63,7 +63,7 @@ test('cleanForm: no prototype keys as template, personal hook removed with 我�
 test('status changes are check-and-set: skip / approve after the draft changed do nothing or fail', async () => {
   fresh(b.id);
   drafts.update(b.id, { status: 'posting' });
-  svc.skip(b.id);
+  assert.throws(() => svc.skip(b.id), /已经处理过了/);
   assert.equal(drafts.get(b.id).status, 'posting');
   await assert.rejects(svc.approve(b.id), /不能批准/);
   assert.throws(() => svc.saveForm(b.id, { l1: 'x' }), /正在发布/);

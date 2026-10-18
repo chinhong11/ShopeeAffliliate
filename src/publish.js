@@ -37,6 +37,7 @@ export async function priceCheck(d, { dryRun = false } = {}) {
   const node = await shopee.product(d.shopId, d.itemId);
   if (!node) return { ok: false, gone: true, message: '商品下架了或不在联盟计划里，这次没有发。' };
   const n = productFromOffer(node), o = d.p;
+  if (!(n.price > 0)) return { ok: false, message: 'Shopee 这次没给出价格（或是 0），已退回待审核，价格没改。这个时段没有发帖。' }; // a glitch, not a new price: keep the old one
   const changed = n.price !== o.price || Math.round(n.disc) !== Math.round(o.disc);
   if (!changed) return { ok: true };
   const moved = movedMoreThan3(o.price, n.price);
@@ -231,7 +232,8 @@ export async function publishDue({ now = Date.now(), log = console.log } = {}) {
         done = r.kind !== 'cancelled';
       } catch (e) { log('  ! ' + e.message); break; }
     }
-    if (!done) setSlot(s.id, 'open'); // still usable by the next tick
+    /* still usable by the next tick, unless a draft was already sent in it: then it may be live (never post twice) */
+    if (!done) db.prepare("UPDATE slots SET status='open' WHERE id=? AND draft_id IS NULL").run(s.id);
   }
   return out;
 }
