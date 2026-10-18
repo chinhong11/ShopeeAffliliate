@@ -59,7 +59,10 @@ export function remindDue(now = Date.now()) {
 export function expireDrafts(now = Date.now()) {
   const r = db.prepare("UPDATE drafts SET status='expired', updated_at=? WHERE status='draft' AND COALESCE(pending_since, created_at)<?").run(now, now - EXPIRE_MS);
   if (r.changes) log(`expired ${r.changes} drafts not approved within 3 days`);
-  return r.changes;
+  /* 失败 for 30 days (its 重试 row has left 已发布): let it go, so the product can come back and its files are cleaned */
+  const f = db.prepare("UPDATE drafts SET status='expired', updated_at=? WHERE status='failed' AND updated_at<?").run(now, now - 30 * 86400e3);
+  if (f.changes) log(`expired ${f.changes} failed drafts after 30 days`);
+  return r.changes + f.changes;
 }
 
 /* posters / photos of finished drafts: big PNGs go after 2 days, thumbnails + photos after 30 (the 已发布 tab

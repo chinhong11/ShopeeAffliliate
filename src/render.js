@@ -3,17 +3,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { createRequire } from 'node:module';
 import { chromium } from 'playwright';
 import { env, dirs, loadConfig } from './config.js';
 import { drafts } from './db.js';
 import { studioState, posterKey, placeholderProblems } from './mapping.js';
 import { startStudioServer } from './static.js';
 
-const require = createRequire(import.meta.url);
-/* the studio loads html-to-image from unpkg; serve the same pinned version from node_modules so renders don't depend on that CDN */
-const H2I_URL = 'https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js';
-const H2I_FILE = require.resolve('html-to-image/dist/html-to-image.js');
 export const STUDIO_PATH = '/studio/Shopee%20Post%20Maker%20v3.html';
 
 let browserP = null, ctxP = null, baseUrl = null, ownServer = null, chain = Promise.resolve();
@@ -59,7 +54,6 @@ export async function openStudio({ fresh = false } = {}) {
     page.on('close', () => ctx.close().catch(() => {}));
   } else page = await (await getContext()).newPage();
   try {
-    await page.route(H2I_URL, r => r.fulfill({ path: H2I_FILE, contentType: 'text/javascript' }));
     await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, fontRoute);
     await page.goto(base + STUDIO_PATH, { waitUntil: 'load', timeout: 60000 });
     await page.waitForFunction(() => window.PostStudio, null, { timeout: 60000 });

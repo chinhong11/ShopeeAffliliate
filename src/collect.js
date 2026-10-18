@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { loadConfig, env } from './config.js';
 import { drafts, kv, newDraftId, dayStr, ymd } from './db.js';
 import * as shopee from './shopee.js';
-import { productFromOffer, STRAT_CODE } from './mapping.js';
+import { productFromOffer, STRAT_CODE, hasDisc } from './mapping.js';
 import { newForm, withCaptions } from './draft.js';
 
 export const STRATEGY_ORDER = ['topSellers', 'highestCommission', 'biggestDiscount'];
@@ -62,7 +62,7 @@ export async function collect({ log = console.log } = {}) {
     highestCommission: interleave(com),
     /* the API has no discount sort: rank the pooled 爆卖 + 高佣 candidates by priceDiscountRate */
     biggestDiscount: [...new Map(interleave([...top, ...com]).map(p => [p.itemId, p])).values()]
-      .filter(p => p.disc > 0).sort((a, b) => b.disc - a.disc)
+      .filter(hasDisc).sort((a, b) => b.disc - a.disc)
   };
 
   const { ok, shops, reasons } = makeFilter(cfg, today);

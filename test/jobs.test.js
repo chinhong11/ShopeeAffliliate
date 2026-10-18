@@ -54,6 +54,15 @@ test('drafts not approved within 3 days of coming up for review expire', () => {
   assert.equal(db.prepare('SELECT status FROM drafts WHERE id=?').get('dback').status, 'draft');
 });
 
+test('a 失败 draft is let go after 30 days (its 重试 row has left 已发布), so the product can come back', () => {
+  const month = Date.now() - 31 * 86400e3, week = Date.now() - 7 * 86400e3;
+  ins.run('dfold', '11', '1', 'top', 'failed', '{}', '{}', dayStr(month), month, month, month);
+  ins.run('dfnew', '12', '1', 'top', 'failed', '{}', '{}', dayStr(week), week, week, week);
+  assert.equal(jobs.expireDrafts(), 1);
+  assert.equal(db.prepare('SELECT status FROM drafts WHERE id=?').get('dfold').status, 'expired');
+  assert.equal(db.prepare('SELECT status FROM drafts WHERE id=?').get('dfnew').status, 'failed', 'still has its 重试');
+});
+
 test('cleanup: big posters of finished drafts after 2 days, thumbnails + photos after 30, live drafts untouched', () => {
   const now = Date.now(), day = 86400e3;
   const touch = (dir, f) => { const p = path.join(dir, f); fs.writeFileSync(p, 'x'); const t = new Date(now - 3 * day); fs.utimesSync(p, t, t); };

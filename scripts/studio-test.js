@@ -7,7 +7,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { chromium } from 'playwright';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-'));
@@ -26,9 +25,8 @@ const srv = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => 
 const B = `http://127.0.0.1:${srv.address().port}`, form = () => drafts.get(d.id).form;
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
-/* the studio loads html-to-image from unpkg (fine in a browser with internet); serve the same file offline */
-const h2i = createRequire(import.meta.url).resolve('html-to-image/dist/html-to-image.js');
-await ctx.route('https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js', r => r.fulfill({ path: h2i, contentType: 'text/javascript' }));
+/* nothing from unpkg: the studio's html-to-image comes from the app (a request there would fail offline) */
+await ctx.route('https://unpkg.com/**', r => { errors.push('unpkg: ' + r.request().url()); r.abort(); });
 
 let failed = 0;
 const check = (name, ok, got) => { if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${ok ? '' : '  got: ' + JSON.stringify(got)}`); };

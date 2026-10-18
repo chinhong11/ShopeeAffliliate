@@ -24,6 +24,7 @@ import { newView } from './views/new.js';
 import { designsView } from './views/designs.js';
 import { brandView } from './views/brand.js';
 import { ready as shopeeReady } from './shopee.js';
+import { H2I_FILE } from './static.js';
 import * as gemini from './gemini.js';
 
 export const app = express();
@@ -79,6 +80,7 @@ app.use((req, res, next) => {
 
 /* 在 Studio 精修 (…v3.html?draft=<id>): the studio page also gets the bar that loads that draft and saves
    what you change back to it (public/studio-bridge.js); the studio files themselves stay as they are */
+app.get('/studio/html-to-image.js', (req, res) => sendFile(res, H2I_FILE, 'text/javascript')); // pinned, from node_modules
 app.get('/studio/:file', (req, res, next) => {
   if (req.params.file !== 'Shopee Post Maker v3.html' || !/^d[0-9a-f]{8}$/.test(String(req.query.draft || ''))) return next();
   const html = fs.readFileSync(path.join(ROOT, 'studio', 'Shopee Post Maker v3.html'), 'utf8');

@@ -12,7 +12,8 @@ if (!secret) {
   secret = crypto.randomBytes(32).toString('hex');
   console.warn('SESSION_SECRET not set: using a random one (logins reset on restart)');
 }
-const mac = s => crypto.createHmac('sha256', secret).update(s).digest('base64url');
+/* the password is part of the key: changing ADMIN_PASSWORD logs out every device */
+const mac = s => crypto.createHmac('sha256', secret + '\0' + (env.ADMIN_PASSWORD || '')).update(s).digest('base64url');
 const eq = (a, b) => { const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 
 export function sessionCookie() {

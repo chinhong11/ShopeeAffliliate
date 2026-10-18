@@ -207,3 +207,27 @@ test('在 Studio 精修 → 保存到草稿: what changed in the studio is kept,
   assert.equal(drafts.get(id).form.look, undefined);
   assert.equal(posterKey(drafts.get(id), cfg), posterKey({ ...d0, form: { ...d0.form, photos: [p0], l1: 'Studio 改的标题', l2: '编辑页改的' } }, cfg));
 });
+
+test('changing ADMIN_PASSWORD logs out every device; the studio loads html-to-image from the app, not unpkg', async () => {
+  const { env } = await import('../src/config.js');
+  const { sessionCookie, isAuthed } = await import('../src/auth.js');
+  const req = c => ({ headers: { cookie: c.split(';')[0] } });
+  const c = sessionCookie();
+  assert.ok(isAuthed(req(c)));
+  const pw = env.ADMIN_PASSWORD;
+  env.ADMIN_PASSWORD = 'a-new-password';
+  assert.ok(!isAuthed(req(c)), 'the old cookie stops working');
+  assert.ok(isAuthed(req(sessionCookie())), 'a new login works');
+  env.ADMIN_PASSWORD = pw;
+  assert.ok(isAuthed(req(c)));
+  /* no third-party script on the app's own site */
+  const html = fs.readFileSync(new URL('../studio/Shopee Post Maker v3.html', import.meta.url), 'utf8');
+  assert.ok(![...html.matchAll(/<script[^>]+src="([^"]+)"/g)].some(m => /^https?:/.test(m[1])), 'only local scripts');
+  const { app } = await import('../src/server.js');
+  const srv = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  const r = await fetch(`http://127.0.0.1:${srv.address().port}/studio/html-to-image.js`, { headers: { cookie: c.split(';')[0] } });
+  srv.close();
+  assert.equal(r.status, 200);
+  assert.match(await r.text(), /htmlToImage/);
+});
+
