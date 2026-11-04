@@ -387,3 +387,14 @@
 #photo.framed,.cellphoto.framed{background-image:none!important;overflow:hidden;}
 #photo.framed::before,.cellphoto.framed::before{content:"";position:absolute;inset:-40px;background:var(--img) center/cover no-repeat;filter:blur(28px) brightness(.88) saturate(1.1);}
 #photo.framed::after,.cellphoto.framed::after{content:"";position:absolute;inset:0;background:var(--img) center/var(--sw) auto no-repeat;}
+/* t3 — 限时抢购 with real data: two typed headline lines ran over the photo and under the seal, and the stock row hid
+   under the bottom bar. The lines run together (shrunk to fit, like 价格暴击), the seal sits on the photo's corner,
+   countdown and stock bar move up so everything ends above the bottom bar (top 940). */
+#post.t3{--fs1:72px;--fs2:36px;}
+#post.t3 #line1{white-space:normal;}
+#post.t3 #caption{top:104px;gap:8px;}
+#post.t3 #grid{inset:256px 70px 444px 70px;}
+#post.t3 #seal{top:248px;}
+#post.t3 #priceTag{bottom:432px;}
+#post.t3 #cdWrap{top:648px;}
+#post.t3 #stockWrap{top:818px;}
