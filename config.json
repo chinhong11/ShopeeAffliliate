@@ -9,8 +9,16 @@
   "brand": { "bstyle": "lee", "bInit": "L", "bName": "LIM", "bTag": "Sharing", "badgec": "#1c1c1e" },
   "voucherCode": "",
   "hashtags": { "zh": "#shopee #好物分享 #开箱", "ms": "#shopee #shopeemalaysia #barangviral" },
+  "contentHashtags": { "zh": "#马来西亚 #生活日常", "ms": "#malaysia #harian" },
   "noRepeatDays": 30,
-  "categories": [],
+  "categories": [
+    { "name": "skincare", "productCatId": null },
+    { "name": "makeup", "productCatId": null },
+    { "name": "phone accessories", "productCatId": null },
+    { "name": "earbuds", "productCatId": null },
+    { "name": "snack", "productCatId": null },
+    { "name": "instant noodle", "productCatId": null }
+  ],
   "strategies": {
     "topSellers": { "enabled": true, "perDay": 2 },
     "highestCommission": { "enabled": true, "perDay": 2 },
