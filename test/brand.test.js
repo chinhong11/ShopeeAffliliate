@@ -75,3 +75,19 @@ test('privacy policy for Meta\'s Go live form: public, names the Page, has the d
   assert.ok(h.includes('LIM Sharing') && h.includes('id="delete"') && h.includes('Data deletion'));
   assert.ok(!h.includes('/static/app.js')); // a plain page, not the review app
 });
+
+test('⬇ 下载数据库备份: a fresh SQLite copy for the logged-in owner only, no file left behind', async () => {
+  assert.ok([302, 401].includes((await get('/backup.db', false)).status));
+  const r = await get('/backup.db'), buf = Buffer.from(await r.arrayBuffer());
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-disposition') || '', /attachment; filename="?shopee-autopost-\d{4}-\d\d-\d\d\.db"?$/);
+  assert.equal(buf.subarray(0, 16).toString('latin1'), 'SQLite format 3\0');
+  const copy = path.join(tmp, 'copy.db'); fs.writeFileSync(copy, buf);
+  const Database = (await import('better-sqlite3')).default, c = new Database(copy, { readonly: true });
+  assert.ok(['drafts', 'posts', 'content', 'kv'].every(t => c.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(t)));
+  assert.ok(c.prepare("SELECT v FROM kv WHERE k='brand:design'").get()); // the data is in it, not just the tables
+  c.close();
+  await new Promise(res => setTimeout(res, 200));
+  assert.deepEqual(fs.readdirSync(path.join(tmp, 'backup')).filter(f => f.startsWith('download-')), []);
+  assert.ok((await (await get('/stats')).text()).includes('href="/backup.db"'));
+});

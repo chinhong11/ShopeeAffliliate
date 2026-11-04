@@ -46,7 +46,7 @@ Any always-on Docker host that deploys from this repo and has a persistent volum
 4. Health check path: `/healthz`.
 5. `config.json` is read from the repo: commit your categories there (it has no secrets).
 
-Backups: `$DATA_DIR/backup/app-YYYY-MM-DD.db`, daily at 03:30, newest 7 kept.
+Backups: `$DATA_DIR/backup/app-YYYY-MM-DD.db`, daily at 03:30, newest 7 kept. They live on the same volume, so 数据 → ⬇ 下载数据库备份 (`/backup.db`, login required) gives a fresh copy to keep elsewhere. To restore one: stop the app, delete `app.db-wal` and `app.db-shm` in `$DATA_DIR`, put the file there as `app.db`, start the app.
 Disk: posters / photos of finished drafts are removed at 00:05 (big PNGs after 2 days, thumbnails and photos after 30), so the volume stays around 50 MB.
 Daily jobs (collect, token check, plan + expiry + cleanup, backup) run at their time, or as soon as the service is back if it was down or restarting then; each runs once a day.
 Memory: a render peaks at ~400–450 MB of Chromium (t1 / t2) and ~600–700 MB (t8, four photos) plus ~150–200 MB for Node; tested in a container limited to 1 GB.

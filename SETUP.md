@@ -137,6 +137,7 @@ With a free Gemini key, each new draft gets its own poster design, **✨ AI 设�
 - **编辑** lets you change the template, headline, photos and text. Changes save by themselves; tap **↻ 重新生成海报** to see the new poster.
 - A draft you don't approve within 3 days expires. On its last day the card says 「⏳ … 过期」.
 - Nothing is ever posted without your approval. A posting time with nothing approved is skipped. With Telegram, you get a reminder about an hour before.
+- About once a month: open **数据** and tap **⬇ 下载数据库备份** at the bottom. Keep the file on your computer or in cloud storage. The app also backs up every night, but on the same disk, so this copy is the one that survives if Railway's disk is lost.
 
 ## Change settings (config.json)
 All settings are in the file `config.json` in the repository. To change one:

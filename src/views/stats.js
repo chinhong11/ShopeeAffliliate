@@ -52,6 +52,9 @@ export function statsView({ brand, range, s, count, gem = null }) {
       <div class="lbl">按模板</div>${bars(s.tpl, false)}
       <div class="lbl">贴士 / 梗图 <span class="soft">已算在帖子数里，不带购买链接，没有佣金</span></div><div class="bars"><div class="br"><div class="bl"><span class="bo">贴士 ${s.content.tip} 帖 · 梗图 ${s.content.meme} 帖</span></div></div></div>
       ${gemBox(gem)}
+      <div class="lbl">备份</div>
+      <div class="gem"><p><a class="btn btn-ghost btn-sm" href="/backup.db" download>⬇ 下载数据库备份</a></p>
+      <p class="soft">草稿、发帖记录、贴士 / 梗图和设置都在这个文件里（不含密码和 token）。服务器每天 03:30 也会自动备份，但存在同一个硬盘上：隔一阵子下载一份，存在自己的电脑或网盘里。</p></div>
       <div class="endpad"></div>
     </div>`;
   return page({ title: '数据', brand, body, tab: 'stats', count });

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import express from 'express';
 import { env, dirs, ROOT, loadConfig } from './config.js';
-import { db, drafts, kv } from './db.js';
+import { db, drafts, kv, dayStr } from './db.js';
 import { isAuthed, sessionCookie, clearCookie, tryLogin } from './auth.js';
 import * as svc from './service.js';
 import { todayView } from './slots.js';
@@ -175,6 +175,13 @@ app.get('/log', (req, res) => {
   });
   const imgOf = r => r.strategy === 'content' ? (fs.existsSync(svc.contentFile(r.draft_id.slice(1))) ? `/posters/${r.draft_id}.png` : '') : fs.existsSync(thumbFile(r.draft_id)) ? `/posters/${r.draft_id}.jpg?k=${r.at}` : (() => { const d = drafts.get(r.draft_id); return d ? '/img/' + d.p.img : ''; })();
   res.send(logView({ brand: brand(), rows, count: pendingCount(), imgOf }));
+});
+
+/* 数据 → ⬇ 下载备份: a fresh copy of app.db to keep off the volume (the daily backups live on the same volume) */
+app.get('/backup.db', async (req, res, next) => {
+  const f = path.join(dirs.backup, `download-${Date.now()}.db`);
+  try { await db.backup(f); } catch (e) { return next(e); }
+  res.download(f, `shopee-autopost-${dayStr()}.db`, () => fs.rmSync(f, { force: true }));
 });
 
 app.get('/stats', async (req, res) => {
