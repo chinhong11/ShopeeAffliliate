@@ -24,6 +24,7 @@ import { newView } from './views/new.js';
 import { designsView } from './views/designs.js';
 import { brandView } from './views/brand.js';
 import { contentView } from './views/content.js';
+import { privacyView } from './views/privacy.js';
 import { ready as shopeeReady } from './shopee.js';
 import { H2I_FILE } from './static.js';
 import * as gemini from './gemini.js';
@@ -48,6 +49,8 @@ app.get('/healthz', (req, res) => {
   try { db.prepare('SELECT 1').get(); res.json({ ok: true, paused: !!svc.pause.get() }); }
   catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
+/* privacy policy + data deletion instructions for Meta's Go live form (SETUP.md 2h) */
+app.get('/privacy', (req, res) => { const b = loadConfig().brand; res.send(privacyView({ page: [b.bName || 'LIM', b.bTag].filter(Boolean).join(' ') })); });
 /* scripts are checked for a newer copy on every load (a cheap 304 when unchanged): they import each other by plain
    URL, so a version in the URL would load a second copy of app.js; an hour-old script once ran against a new page */
 app.use('/static', express.static(path.join(ROOT, 'public'), { maxAge: '1h', setHeaders: (res, f) => { if (f.endsWith('.js')) res.set('Cache-Control', 'no-cache'); } }));

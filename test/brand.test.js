@@ -68,3 +68,10 @@ test('生成: the choices are saved (checked) and the PNGs are Facebook-sized: c
   assert.equal((await get('/brand/other.png')).status, 404);
   assert.ok([302, 401].includes((await get('/brand/cover.png', false)).status), 'pictures need the login too');
 });
+
+test('privacy policy for Meta\'s Go live form: public, names the Page, has the data deletion part', async () => {
+  const r = await get('/privacy', false), h = await r.text();
+  assert.equal(r.status, 200);
+  assert.ok(h.includes('LIM Sharing') && h.includes('id="delete"') && h.includes('Data deletion'));
+  assert.ok(!h.includes('/static/app.js')); // a plain page, not the review app
+});

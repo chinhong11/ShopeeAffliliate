@@ -55,10 +55,15 @@ Use the long-lived token here: a Page token made from the short-lived one stops 
 
 **2g. Check it.** In the Access Token Debugger, paste the Page token and click **Debug**. It should show that it's a Page token for your Page and that it never expires **(the exact labels are unconfirmed)**. The app checks the same thing every day and shows a red banner if anything is wrong.
 
-**2h. Important: check that everyone can see the posts.** Posts made through an app that is still in **Development** mode may be visible only to people with a role on the app. Older Meta docs and recent reports from other tools say so; we could not test it.
-1. After the first real post (Step 5), open your Page in a private or incognito window where you're not logged in, and check that the post is there.
-2. If it isn't, open your app's dashboard, then **Publish** → **Go live**. Meta asks for a privacy policy URL, data deletion instructions, an app icon and a category.
-3. Whether posting keeps working in Live mode without App Review is **unconfirmed**: Meta's docs disagree. After going live, post once more and check again.
+**2h. Important: switch the app to Live before the first real post.** Meta's [App Modes](https://developers.facebook.com/docs/development/build-and-test/app-modes/) page says posts made by an app in **Development** mode are visible only to people with a role on the app. Your fans would see nothing. Do this once Step 3 is done, because you need the app's address (`PUBLIC_URL`).
+1. In your app's dashboard, open **App settings** → **Basic** and fill in:
+   - **Privacy policy URL:** your `PUBLIC_URL` followed by `/privacy`, for example `https://….up.railway.app/privacy`. The app shows this page to anyone, without the password. Open it once and read it: it describes what the app does with data.
+   - **User data deletion:** choose **Data deletion instructions URL** and enter the same address with `#delete` at the end (`…/privacy#delete`).
+   - **App icon** and **Category**: any square picture of yours (Meta asks for 1024×1024) and the category closest to "business" or "pages" **(the exact sizes and names are unconfirmed)**.
+   - Click **Save changes**.
+2. Open **Publish** in the left menu and click **Go live** (or **Publish**) **(the button's name is unconfirmed)**.
+3. Your own permissions keep working in Live mode: people with a role on the app can still use the permissions from 2b without App Review ([Meta: access levels](https://developers.facebook.com/docs/graph-api/overview/access-levels/)).
+4. After the first real post (Step 5), open your Page in a private or incognito window where you're not logged in, and check that the post is there.
 
 ## Step 3: Put the app online (Railway)
 **Plan:** Railway's Free plan allows only 0.5 GB of memory, and this app needs about 1 GB while it makes posters. Use the **Hobby** plan ($5 a month, which includes $5 of usage) or higher. Railway bills memory and CPU by use, and we measured the app's memory, not its Railway bill, so look at Railway's usage page after the first week. Don't turn on **Serverless**: it puts the app to sleep, and then it misses posting times. (Prices from [Railway's docs](https://docs.railway.com/pricing/plans) in October 2026.)
@@ -116,11 +121,12 @@ With a free Gemini key, each new draft gets its own poster design, **✨ AI 设�
 2. Add it to your home screen so it opens like an app:
    - iPhone (Safari): tap the **Share** button, then **Add to Home Screen**.
    - Android (Chrome): tap **⋮**, then **Add to Home screen** or **Install app**.
-3. Make sure `categories` in `config.json` lists what you want to collect (see [Change settings](#change-settings-configjson)). It is empty at first, and 抓取 stops and says so.
-4. Tap **↻ 抓取**. New drafts appear as cards, and their posters fill in by themselves.
-5. Approve one card with **批准**. The message tells you when it will post, for example 「已批准 · 今天 20:30 发布」.
-6. After that time, open your Facebook Page and check the post and its first comment with the Shopee link. The app can't pin the comment; pin it by hand if you want it on top.
-7. Do the visibility check in Step 2h.
+3. `categories` in `config.json` says what to collect. It now searches Shopee for skincare, makeup, phone accessories, earbuds, snack and instant noodle; change the words there to collect something else (see [Change settings](#change-settings-configjson)). If it is ever empty, 抓取 stops and says so.
+4. Before you approve anything, make sure your Meta app is **Live** (Step 2h).
+5. Tap **↻ 抓取**. New drafts appear as cards, and their posters fill in by themselves.
+6. Approve one card with **批准**. The message tells you when it will post, for example 「已批准 · 今天 20:30 发布」.
+7. After that time, open your Facebook Page and check the post and its first comment with the Shopee link. The app can't pin the comment; pin it by hand if you want it on top.
+8. Check that the post can be seen when you are logged out (Step 2h, point 4). If it can't, the app is still in Development mode: do Step 2h.
 
 ## Every day
 - At the collect time (08:00 unless you change it) the app collects new products and makes drafts. With Telegram set up, the posters arrive on your phone.
