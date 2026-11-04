@@ -57,7 +57,9 @@ export function shortName(s) {
 export const hasDisc = p => num(p.disc) !== null && p.disc >= 10;
 export const hasRating = p => num(p.rating) !== null && p.rating > 0;
 /* was = now / (1 - rate/100), 2 decimals; prefer a real original price if the API gave one */
-export const wasOf = p => !hasDisc(p) ? '' : rm(num(p.originalPrice) || p.price / (1 - p.disc / 100));
+/* the original price only when it is known (typed in for a product added by hand). The API gives a whole-number discount,
+   and price ÷ (1 − discount) can be a few sen or ringgit off the real one on Shopee, so it isn't shown */
+export const wasOf = p => hasDisc(p) && num(p.originalPrice) ? rm(num(p.originalPrice)) : '';
 export const pctOf = p => hasDisc(p) ? '-' + Math.round(p.disc) + '%' : '';
 export const rateOf = p => hasRating(p) ? Number(p.rating).toFixed(1) : '';
 export const commOf = p => p.manual ? '手动添加 · 你自己的推广链接' : '佣金 ' + +(p.comm * 100).toFixed(1) + '% ≈ ' + rm(p.price * p.comm) + '/单';

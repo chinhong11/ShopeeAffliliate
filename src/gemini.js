@@ -13,7 +13,7 @@ export function prompt(d, cfg) {
   const facts = [
     `商品：${shortName(p.name)}（完整名称：${p.name}）`,
     `现价：${rm(p.price)}`,
-    hasDisc(p) ? `原价：${wasOf(p)}（${pctOf(p)}）` : '',
+    hasDisc(p) ? (wasOf(p) ? `原价：${wasOf(p)}（${pctOf(p)}）` : `折扣：${pctOf(p)}`) : '',
     hasRating(p) ? `评分：${rateOf(p)} / 5` : '',
     p.sales ? fmtSold(p.sales) : '',
     code ? `折扣码：${code}` : '',
@@ -126,7 +126,7 @@ export function designPrompt(d) {
   return `你是 Facebook 好物分享帖的海报设计师。海报 1080×1080：上半部是商品照片（附上了，不会被文字盖住），下半部是一个纯色面板，放标题、价格和按钮。
 请看照片和商品资料，为这一帖设计独特又好看的配色和风格，要配合商品和照片的颜色，不要每次都用红色。
 商品：${p.name}
-现价：${rm(p.price)}${hasDisc(p) ? `（原价 ${wasOf(p)}，${pctOf(p)}）` : ''}
+现价：${rm(p.price)}${hasDisc(p) ? (wasOf(p) ? `（原价 ${wasOf(p)}，${pctOf(p)}）` : `（${pctOf(p)}）`) : ''}
 海报标题：${(d.form.l1 || '').replace(/\n/g, ' ')} / ${d.form.l2 || ''}
 
 要选的：

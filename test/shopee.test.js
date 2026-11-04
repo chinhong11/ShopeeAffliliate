@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 process.env.SHOPEE_APP_ID = 'app1'; process.env.SHOPEE_APP_SECRET = 'sec1';
 process.env.DATA_DIR = process.env.TEST_DATA_DIR || './data-test';
 const shopee = await import('../src/shopee.js');
-const { productFromOffer, fmtSold, shortName, wasOf, pctOf, commOf, rm } = await import('../src/mapping.js');
+const { productFromOffer, fmtSold, shortName, wasOf, pctOf, commOf } = await import('../src/mapping.js');
 
 test('signature = sha256(AppId + Timestamp + Payload + Secret)', () => {
   const payload = '{"query":"{ a }","variables":{}}';
@@ -53,7 +53,9 @@ test('mapping rules', () => {
   assert.equal(shortName('a'.repeat(30)).length, 24);
   assert.equal(fmtSold(860), '已售 860'); assert.equal(fmtSold(1234), '已售 1.2k+'); assert.equal(fmtSold(12999), '已售 12k+');
   assert.equal(fmtSold(1234, 'mix'), '1.2k+ sold');
-  assert.equal(pctOf(p), '-67%'); assert.equal(wasOf(p), rm(12.9 / 0.33));
+  /* the API gives a whole-number discount: no original price is worked out from it (it could be off), only a typed-in one shows */
+  assert.equal(pctOf(p), '-67%'); assert.equal(wasOf(p), '');
+  assert.equal(wasOf({ ...p, originalPrice: 39.9 }), 'RM 39.90');
   assert.equal(wasOf({ ...p, disc: 9 }), ''); assert.equal(pctOf({ ...p, disc: 9 }), '');
   assert.equal(commOf(p), '佣金 8% ≈ RM 1.03/单');
 });

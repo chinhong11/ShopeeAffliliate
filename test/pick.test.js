@@ -18,7 +18,7 @@ test('template rules, first match wins', () => {
 test('headline: first matching condition, A/B alternate per condition', () => {
   const rot = {};
   assert.deepEqual(headline(P({ disc: 67 }), cfg, rot), ['把价格\n打下来了！', '现在只要 RM 12.90']);
-  assert.deepEqual(headline(P({ disc: 67 }), cfg, rot), ['直接砍到\nRM 12.90！', '原价 RM 39.09']);
+  assert.deepEqual(headline(P({ disc: 67 }), cfg, rot), ['直接砍到\nRM 12.90！', '直降 67%']);
   assert.deepEqual(headline(P({}), cfg, rot), ['全网都在抢的\n爆款', '已售 15k+ 件']);
   assert.deepEqual(headline(P({}), cfg, rot), ['大家都在买的\n这个', '已售 15k+ 件 · ★4.9']);
   assert.deepEqual(headline(P({ sales: 1200 }), cfg, rot), ['评分 4.9 的\n宝藏好物', '买过的都说值']);

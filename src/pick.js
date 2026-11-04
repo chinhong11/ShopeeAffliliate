@@ -14,13 +14,13 @@ export function pickTemplate(p, prev, hasReview) {
    the poster shrinks a line that doesn't fit down to 75 %, then wraps it */
 export const HL = {
   zh: {
-    disc: [['把价格\n打下来了！', '现在只要 {now}'], ['直接砍到\n{now}！', '原价 {was}']],
+    disc: [['把价格\n打下来了！', '现在只要 {now}'], ['直接砍到\n{now}！', '直降 {off}']],
     sales: [['全网都在抢的\n爆款', '{sold} 件'], ['大家都在买的\n这个', '{sold} 件 · ★{rate}']],
     rate: [['评分 {rate} 的\n宝藏好物', '买过的都说值'], ['{rate} 分好评\n闭眼入', '{sold}']],
     base: [['我不允许你\n还不知道这个', '{now} · ★{rate}'], ['这个必须\n分享给你们', '{now} · ★{rate}']]
   },
   ms: {
-    disc: [['Harga dah\njatuh teruk!', 'Sekarang {now} je'], ['Turun terus\nke {now}!', 'Harga asal {was}']],
+    disc: [['Harga dah\njatuh teruk!', 'Sekarang {now} je'], ['Turun terus\nke {now}!', 'Jimat {off}']],
     sales: [['Barang viral\nramai rebut!', '{sold}'], ['Ramai dah\nbeli yang ni', '{sold} · ★{rate}']],
     rate: [['Rating {rate}\nmemang power', 'Pembeli puas hati'], ['Review {rate}★\ntak menyesal', '{sold}']],
     base: [['Korang wajib\ntahu ni!', '{now} · ★{rate}'], ['Yang ni\nwajib share', '{now} · ★{rate}']]
@@ -43,7 +43,7 @@ export const hlKind = p => p.disc >= 40 ? 'disc' : p.sales >= 5000 ? 'sales' : p
 
 export function fill(t, p, lang = 'zh') {
   if (!hasRating(p)) t = t.replace(/ · ★\{rate\}/g, '');
-  return t.replace(/\{now\}/g, rm(p.price)).replace(/\{was\}/g, wasOf(p)).replace(/\{pct\}/g, pctOf(p))
+  return t.replace(/\{now\}/g, rm(p.price)).replace(/\{pct\}/g, pctOf(p)).replace(/\{off\}/g, Math.round(p.disc) + '%')
     .replace(/\{sold\}/g, fmtSold(p.sales, lang)).replace(/\{rate\}/g, rateOf(p));
 }
 
