@@ -35,6 +35,13 @@ test('gql throws GraphQL errors without retrying', async () => {
   assert.equal(calls, 1);
 });
 
+test('Shopee error codes read as what to do, with Shopee\'s own words kept', async () => {
+  const say = (code, message) => async () => new Response(JSON.stringify({ errors: [{ message, extensions: { code } }] }));
+  await assert.rejects(shopee.gql('{ x }', {}, { fetchImpl: say(10035, 'You currently do not have access') }), e => /还没开通 Open API/.test(e.message) && /手动添加/.test(e.message) && /10035: You currently/.test(e.message) && e.code === 10035);
+  await assert.rejects(shopee.gql('{ x }', {}, { fetchImpl: say(10033, 'account frozen') }), /账号被拒绝了.*10033: account frozen/);
+  await assert.rejects(shopee.gql('{ x }', {}, { fetchImpl: say(11001, 'params error') }), /Shopee API error 11001: params error/);
+});
+
 test('subIds are letters and digits only, max 5', () => {
   assert.deepEqual(shopee.cleanSubIds(['fb', 't-1', 'top', '2026-10-10', 'd_ab12', 'x']), ['fb', 't1', 'top', '20261010', 'dab12']);
 });

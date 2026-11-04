@@ -16,7 +16,9 @@ Shopee and Facebook may take a while to approve things, so start with Steps 1 an
 ## Step 1: Shopee Affiliate Open API keys
 1. If you aren't a Shopee affiliate yet, sign up in the Shopee app: **Me** → **Shopee Affiliate**, then follow the steps (account type, platform, link, phone and email, declaration, social media authorisation). Shopee reviews applications. You need a public social media account, to be a local user in Malaysia and to be 18 or older. ([Shopee help](https://help.shopee.com.my/portal/10/article/205759-How-to-Sign-Up-for-the-Shopee-Affiliate-Program))
 2. On a computer, log in at https://affiliate.shopee.com.my and open **Open API**, near the bottom of the left menu **(unconfirmed: from third-party guides)**. Copy your **AppID** and **Secret**.
-3. If it says you don't have access to the Open API, access may need a separate request **(unconfirmed)**. Ask Shopee through the [affiliate enquiry form](https://help.shopee.com.my/portal/webform/99dbea1dc4894accae65f606c2f91af5).
+3. Open API access is a separate approval: being a Shopee affiliate isn't enough. If the page says you don't have access, ask Shopee through the [affiliate enquiry form](https://help.shopee.com.my/portal/webform/99dbea1dc4894accae65f606c2f91af5). (Open-source clients of the API list the error Shopee sends without access, and its message asks you to contact Shopee; Shopee's own docs need a login, so the exact steps are **unconfirmed**.)
+   - Until you have access, the app still works: add products with **＋ 手动添加**. The daily 抓取 shows 「你的 Shopee 联盟账号还没开通 Open API」 instead of making drafts.
+   - Other Shopee problems also show in plain words on the 待审核 page (and in Telegram), for example wrong AppID / Secret or a frozen affiliate account, with Shopee's own words in brackets.
 4. Keep both for Step 3: they become `SHOPEE_APP_ID` and `SHOPEE_APP_SECRET`.
 
 The app calls `https://open-api.affiliate.shopee.com.my/graphql`. If your Open API page shows a different address, set it as `SHOPEE_ENDPOINT` in Step 3.

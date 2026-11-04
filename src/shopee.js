@@ -27,6 +27,16 @@ export function authHeader(appId, secret, payload, timestamp = Math.floor(Date.n
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+/* Shopee's error codes (from open-source clients of the Open API; the docs need a login) → what to do, in plain words.
+   Shopee's own code and words follow in brackets. */
+const ACCOUNT = '这个 Shopee 联盟账号被拒绝了（冻结、停用或没有权限）：登录 affiliate.shopee.com.my 看看账号状态，或问 Shopee。';
+const PLAIN = {
+  10020: 'Shopee 不接受这个请求：SHOPEE_APP_ID / SHOPEE_APP_SECRET 不对，或服务器时间不准。到 Open API 页面重新复制 AppID 和 Secret（SETUP.md 第 1 步）。',
+  10030: 'Shopee 那边说请求太频繁了，过一会儿再抓。',
+  10031: ACCOUNT, 10032: ACCOUNT, 10033: ACCOUNT, 10034: ACCOUNT,
+  10035: '你的 Shopee 联盟账号还没开通 Open API：要另外申请（SETUP.md 第 1 步）。开通之前，可以用 ＋ 手动添加 发商品。'
+};
+
 /* signs every request; retries 429 / 5xx (and GraphQL rate-limit errors) with backoff, 3 tries */
 export async function gql(query, variables = {}, { tries = 3, fetchImpl = fetch } = {}) {
   if (!env.SHOPEE_APP_ID || !env.SHOPEE_APP_SECRET) throw new ShopeeError('SHOPEE_APP_ID / SHOPEE_APP_SECRET missing in .env');
@@ -48,7 +58,7 @@ export async function gql(query, variables = {}, { tries = 3, fetchImpl = fetch 
     try { json = JSON.parse(text); } catch { throw new ShopeeError(`HTTP ${res.status}: ${text.slice(0, 200)}`, { status: res.status }); }
     if (json.errors && json.errors.length) {
       const e0 = json.errors[0], code = e0.extensions && e0.extensions.code;
-      const err = new ShopeeError(`Shopee API error ${code ?? ''}: ${e0.message}`, { code, status: res.status });
+      const err = new ShopeeError(PLAIN[code] ? `${PLAIN[code]}（Shopee ${code}: ${e0.message}）` : `Shopee API error ${code ?? ''}: ${e0.message}`, { code, status: res.status });
       if (code === 10030) { last = err; continue; } // rate limit
       throw err;
     }
